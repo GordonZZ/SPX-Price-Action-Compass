@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 import { generateSPX1YearHistory } from "./src/utils/spxGenerator.ts";
@@ -80,7 +79,7 @@ async function syncTimeframe(tf: Timeframe) {
         fetched = aggregate1HTo4H(hourly);
       }
     } else if (tf === "1d") {
-      fetched = await fetchYahooFinanceSPXGeneric("1d", "2y");
+      fetched = await fetchYahooFinanceSPXGeneric("1d", "3y");
     }
 
     if (fetched.length > 0) {
@@ -204,7 +203,7 @@ app.get("/api/spx-data", async (req, res) => {
     } else if (timeframe === "4h") {
       filtered = finalCandles.slice(-1000); // Plenty of 4h candles
     } else if (timeframe === "1d") {
-      filtered = finalCandles.slice(-1000); // Full 2 years history
+      filtered = finalCandles.slice(-1200); // Full 3 years history
     }
   }
 
@@ -212,26 +211,37 @@ app.get("/api/spx-data", async (req, res) => {
   const trend = detectTrend(filtered);
   const patterns = detectPatterns(filtered);
 
-  // S&R zones are calculated from a timeframe-appropriate historical window.
-  // Lower timeframes (1m, 5m, 15m) use a 21-trading-day window to capture recent intraday structure.
-  // Higher timeframes (4h, 1d) use a longer-term window (250-500 candles / ~1-2 years) to capture major structural support/resistance.
-  let zonesCandlesCount = 1638;
+  // S&R zones are calculated from a timeframe-appropriate historical window with adaptive swing parameters and tolerances.
+  let zonesCandlesCount = 150;
+  let swingStrength = 5;
+  let tolerancePercent = 0.0015;
+
   if (timeframe === "1d") {
-    zonesCandlesCount = 250; // 1 year of daily K-lines
+    zonesCandlesCount = 750; // Over 3 years of daily peaks/troughs
+    swingStrength = 6;
+    tolerancePercent = 0.005; // 0.5% clustering for daily
   } else if (timeframe === "4h") {
-    zonesCandlesCount = 500; // ~1 year of 4-hour K-lines
+    zonesCandlesCount = 300; // Rich window of 300 bars
+    swingStrength = 5;
+    tolerancePercent = 0.004; // 0.4% clustering for 4h
   } else if (timeframe === "15m") {
-    zonesCandlesCount = 546;
+    zonesCandlesCount = 200;
+    swingStrength = 5;
+    tolerancePercent = 0.002; // 0.2% clustering
   } else if (timeframe === "5m") {
-    zonesCandlesCount = 1638;
+    zonesCandlesCount = 150; // Double original density
+    swingStrength = 4;
+    tolerancePercent = 0.0015; // 0.15%
   } else if (timeframe === "1m") {
-    zonesCandlesCount = 3000;
+    zonesCandlesCount = 390;
+    swingStrength = 5;
+    tolerancePercent = 0.001; // 0.1% for high resolution 1m
   }
 
   const zonesBaseCandles = finalCandles.slice(-zonesCandlesCount);
   const finalZonesCandles = zonesBaseCandles.length > 0 ? zonesBaseCandles : filtered;
-  const { highs: zoneHighs, lows: zoneLows } = findSwingPoints(finalZonesCandles, 6, 6);
-  const zones = detectSupportResistanceZones(finalZonesCandles, zoneHighs, zoneLows);
+  const { highs: zoneHighs, lows: zoneLows } = findSwingPoints(finalZonesCandles, swingStrength, swingStrength);
+  const zones = detectSupportResistanceZones(finalZonesCandles, zoneHighs, zoneLows, tolerancePercent);
 
   res.json({
     candles: filtered,
@@ -246,96 +256,6 @@ app.get("/api/spx-data", async (req, res) => {
 app.post("/api/spx-sync", async (req, res) => {
   await syncAllTimeframes();
   res.json({ success: true, lastUpdated: new Date().toISOString() });
-});
-
-// 3. API Endpoint: Gemini Price Action Coach
-app.post("/api/coach-analyze", async (req, res) => {
-  const { candles, activePattern } = req.body as { candles: Candle[]; activePattern?: any };
-
-  if (!candles || candles.length === 0) {
-    return res.status(400).json({ error: "Candles data is required for analysis." });
-  }
-
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (!geminiApiKey || geminiApiKey === "MY_GEMINI_API_KEY") {
-    return res.json({
-      text: `### 🎓 Price Action Coach Analysis
-
-⚠️ **Gemini API Key is not configured yet.**
-To unlock real-time, professional AI price action coaching:
-1. Open the **Settings > Secrets** panel in the AI Studio UI.
-2. Provide a valid \`GEMINI_API_KEY\`.
-
----
-
-#### 💡 Coach's Quick Tip:
-Based on the **${candles.length} bars** of price action submitted, the market is presenting classic structure:
-- **Last Price**: $${candles[candles.length - 1].close.toFixed(2)}
-- **Pattern Selected**: ${activePattern ? `**${activePattern.name}**` : "None"}
-- **Study Tip**: Look at the shadow lengths relative to the bodies. Notice how rejection of highs or lows near recent pivot levels leads to sudden directional changes. That is the essence of Price Action trading!`
-    });
-  }
-
-  try {
-    const ai = new GoogleGenAI({
-      apiKey: geminiApiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-
-    // Simplify the payload so we don't blow up token count
-    const simplifiedCandles = candles.slice(-100).map(c => ({
-      time: new Date(c.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      O: c.open,
-      H: c.high,
-      L: c.low,
-      C: c.close
-    }));
-
-    const patternContext = activePattern 
-      ? `The user is specifically focusing on a detected **${activePattern.name}** pattern around price $${activePattern.price}. Context: ${activePattern.description}.`
-      : "The user is looking at a general slice of the 5-minute SPX chart.";
-
-    const prompt = `You are an elite, world-class Price Action trading mentor (specializing in Bob Volman and Al Brooks style price action). 
-Your task is to analyze the following sequence of 5-minute SPX (S&P 500) candles and provide an actionable, deep-dive price action lesson.
-
----
-[CONTEXT]
-${patternContext}
-
----
-[CANDLE DATA (OHLC)]
-${JSON.stringify(simplifiedCandles, null, 2)}
-
----
-Your analysis MUST be structured, engaging, and highly educational ("Wow" effect). Write in elegant, authoritative markdown:
-1. **Trend & Market Structure**: Identify whether we are in a strong trend (bullish/bearish) or a trading range (accumulation/distribution). Point out any Higher Highs/Lows or Lower Highs/Lows.
-2. **Key Level Diagnostics**: Highlight where the immediate support and resistance boundaries are, and how price behaves as it approaches them.
-3. **Pattern Break Down**: Analyze the specific pattern selected (or visible). Explain the psychology behind this pattern (e.g., trapped sellers/buyers, exhaustion, or breakout compression).
-4. **Actionable Trading Strategy**: Give concrete guidelines for a price action trader on this chart:
-   - **Trigger / Entry**: What precise price trigger should we wait for (e.g. breakout of a signal bar's high/low)?
-   - **Stop Loss Placement**: Where is the pattern invalidated?
-   - **Take Profit Targets**: Realistic next target levels based on recent swings.
-
-Keep your tone professional, encouraging, and razor-focused on price action (No indicators, moving averages, or RSI. Rely 100% on pure candles, support/resistance, and volume). Give specific prices from the candle dataset to make the lesson extremely concrete!`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: "You are a professional, direct, and elite price action coach. You never recommend indicators or complex metrics, teaching pure candlestick structure, swing levels, and market psychology.",
-        temperature: 0.7,
-      }
-    });
-
-    res.json({ text: response.text });
-  } catch (err: any) {
-    console.error("Gemini Coach Error:", err);
-    res.status(500).json({ error: "Failed to query Gemini Coach: " + err.message });
-  }
 });
 
 // Vite & Static file serving setup

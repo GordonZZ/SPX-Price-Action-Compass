@@ -2,6 +2,29 @@ import React, { useState, useRef, useEffect } from "react";
 import { Candle, DetectedPattern, SupportResistanceZone, MarketTrend } from "../types.js";
 import { Layers, Eye, EyeOff, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 
+const getPatternLabel = (type: string, name: string): string => {
+  switch (type) {
+    case "PIN_BAR_BULLISH": return "↗ 看涨 Pin Bar";
+    case "PIN_BAR_BEARISH": return "↘ 看跌 Pin Bar";
+    case "ENGULFING_BULLISH": return "↗ 看涨吞没";
+    case "ENGULFING_BEARISH": return "↘ 看跌吞没";
+    case "MORNING_STAR": return "↗ 启明星";
+    case "EVENING_STAR": return "↘ 黄昏星";
+    case "DOJI": return "⇅ 十字星";
+    case "INSIDE_BAR": return "⇄ 内含线";
+    case "DOUBLE_TOP": return "↘ 双顶结构";
+    case "DOUBLE_BOTTOM": return "↗ 双底结构";
+    case "HEAD_AND_SHOULDERS": return "↘ 头肩顶";
+    case "INVERSE_HEAD_AND_SHOULDERS": return "↗ 头肩底";
+    case "FLAG_BULLISH": return "↗ 看涨旗形";
+    case "FLAG_BEARISH": return "↘ 看跌旗形";
+    case "TRIANGLE_ASCENDING": return "↗ 上升三角";
+    case "TRIANGLE_DESCENDING": return "↘ 下降三角";
+    case "TRIANGLE_SYMMETRICAL": return "⇄ 对称三角";
+    default: return name.split(" (")[0];
+  }
+};
+
 interface PriceActionChartProps {
   candles: Candle[];
   patterns: DetectedPattern[];
@@ -50,15 +73,50 @@ export default function PriceActionChart({
   const rightPadding = Math.max(8, Math.floor(zoomLevel * 0.15));
   const maxStartIndex = Math.max(0, totalCandles - zoomLevel + rightPadding);
 
+  const getNYFormattedString = (timeMs: number) => {
+    const et = getETComponents(timeMs);
+    const yyyy = et.year;
+    const mm = String(et.month).padStart(2, "0");
+    const dd = String(et.day).padStart(2, "0");
+    const hh = String(et.hour).padStart(2, "0");
+    const min = String(et.minute).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  };
+
   // Initialize view: scroll to the very end but leave a beautiful blank padding on the right
   useEffect(() => {
     if (totalCandles > 0) {
-      const defaultZoom = Math.min(totalCandles, 100);
+      if (timeframe === "15m") {
+        let targetStart = -1;
+        let targetEnd = -1;
+        for (let i = 0; i < totalCandles; i++) {
+          const nyStr = getNYFormattedString(candles[i].time);
+          if (targetStart === -1 && nyStr >= "2026-06-29 14:30") {
+            targetStart = i;
+          }
+          if (nyStr <= "2026-07-02 16:00") {
+            targetEnd = i;
+          }
+        }
+        if (targetStart !== -1 && targetEnd !== -1 && targetEnd >= targetStart) {
+          const computedZoom = targetEnd - targetStart + 1;
+          setZoomLevel(computedZoom);
+          setStartIndex(targetStart);
+          return;
+        }
+      }
+
+      // Default zoom sizing
+      let defaultZoom = Math.min(totalCandles, 100);
+      if (timeframe === "4h") {
+        defaultZoom = Math.min(totalCandles, 60);
+      }
+      
       setZoomLevel(defaultZoom);
       const pad = Math.max(8, Math.floor(defaultZoom * 0.15));
       setStartIndex(Math.max(0, totalCandles - defaultZoom + pad));
     }
-  }, [totalCandles]);
+  }, [totalCandles, timeframe, candles]);
 
   // Adjust view when focusIndex is requested (e.g. clicking a pattern in the sidebar)
   useEffect(() => {
@@ -69,17 +127,6 @@ export default function PriceActionChart({
       setStartIndex(targetStart);
     }
   }, [focusIndex, zoomLevel, maxStartIndex]);
-
-  if (totalCandles === 0) {
-    return (
-      <div className="h-[500px] flex flex-col items-center justify-center bg-gray-950 border border-gray-800 rounded-2xl text-gray-400">
-        <div className="animate-pulse flex flex-col items-center">
-          <Layers className="w-12 h-12 text-gray-600 mb-3" />
-          <p className="text-sm">等待 K 线数据载入...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Calculate visible range (safely clamped to bounds)
   const activeStartIndex = Math.max(0, Math.min(totalCandles - 1, startIndex));
@@ -194,6 +241,23 @@ export default function PriceActionChart({
   };
 
   const isDaily = timeframe === "1d";
+
+  const getPeriodLabel = () => {
+    switch (timeframe) {
+      case "1d":
+        return "200天";
+      case "4h":
+        return "54根K线";
+      case "15m":
+        return "150根K线";
+      case "5m":
+        return "75根K线";
+      case "1m":
+        return "390根K线";
+      default:
+        return "75根K线";
+    }
+  };
 
   // Helper to generate beautifully aligned ticks on the X-axis
   const getXAxisTicks = () => {
@@ -442,6 +506,112 @@ export default function PriceActionChart({
     setCrosshairPos(null);
   };
 
+  // Modern broker-style wheel zoom centered under the cursor
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      if (totalCandles === 0) return;
+
+      const rect = container.getBoundingClientRect();
+      const clientX = e.clientX - rect.left;
+      const svgX = (clientX / rect.width) * chartWidth;
+      const clampedX = Math.max(60, Math.min(chartWidth, svgX));
+      const ratio = (clampedX - 60) / candleAreaWidth;
+
+      // Locate the exact candle index under the mouse cursor before zoom
+      const mouseCandleIndex = startIndex + ratio * zoomLevel;
+
+      // Adjust zoom multiplier (scroll up -> zoom in, scroll down -> zoom out)
+      const zoomFactor = e.deltaY < 0 ? 0.85 : 1.15;
+      let nextZoom = Math.round(zoomLevel * zoomFactor);
+      nextZoom = Math.max(10, Math.min(totalCandles, nextZoom));
+
+      if (nextZoom === zoomLevel) return;
+
+      const nextPad = Math.max(8, Math.floor(nextZoom * 0.15));
+      const nextMaxStart = Math.max(0, totalCandles - nextZoom + nextPad);
+
+      // Re-anchor start index so that the same candle index stays under the cursor ratio
+      let nextStart = mouseCandleIndex - ratio * nextZoom;
+      nextStart = Math.max(0, Math.min(nextMaxStart, Math.round(nextStart)));
+
+      setZoomLevel(nextZoom);
+      setStartIndex(nextStart);
+
+      // Immediately refresh the crosshair coordinates to keep it perfectly snapped
+      const svgY = (e.clientY - rect.top) / rect.height * (totalChartHeight + 20);
+      if (clampedX >= 60 && clampedX <= chartWidth && svgY >= 0 && svgY <= totalChartHeight) {
+        const candleWidth = candleAreaWidth / nextZoom;
+        const relativeIndex = Math.floor((clampedX - 60) / candleWidth);
+        const activeStartIndex = Math.max(0, Math.min(totalCandles - 1, nextStart));
+        const endIndex = Math.min(totalCandles, activeStartIndex + nextZoom);
+        const nextVisibleCandles = candles.slice(activeStartIndex, endIndex);
+        const actualIndexInVisible = Math.max(0, Math.min(nextVisibleCandles.length - 1, relativeIndex));
+        const candle = nextVisibleCandles[actualIndexInVisible];
+
+        if (candle) {
+          // Re-scale min-max range for the new visible candles to project exact price at mouse Y
+          const nextVisibleHighs = nextVisibleCandles.map(c => c.high).filter(h => typeof h === "number" && !isNaN(h) && isFinite(h));
+          const nextVisibleLows = nextVisibleCandles.map(c => c.low).filter(l => typeof l === "number" && !isNaN(l) && isFinite(l));
+          const nextRawMax = nextVisibleHighs.length > 0 ? Math.max(...nextVisibleHighs) : 100;
+          const nextRawMin = nextVisibleLows.length > 0 ? Math.min(...nextVisibleLows) : 0;
+          const nextMaxPrice = nextRawMax * 1.001;
+          const nextMinPrice = nextRawMin * 0.999;
+          const nextPriceRange = Math.max(0.01, nextMaxPrice - nextMinPrice);
+          const priceY = nextMinPrice + nextPriceRange * (chartHeight - 20 - svgY) / (chartHeight - 40);
+
+          const daysOfWeek = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+          const etDate = new Date(new Intl.DateTimeFormat("en-US", {
+            timeZone: "America/New_York",
+            year: "numeric",
+            month: "numeric",
+            day: "numeric"
+          }).format(new Date(candle.time)));
+          const dayOfWeekStr = daysOfWeek[etDate.getDay()];
+          const et = getETComponents(candle.time);
+          const yearStr = et.year;
+          const monthStr = String(et.month).padStart(2, "0");
+          const dayStr = String(et.day).padStart(2, "0");
+          const datePart = `${yearStr}-${monthStr}-${dayStr}`;
+
+          let dateStr = "";
+          if (isDaily) {
+            dateStr = `${datePart} ${dayOfWeekStr}`;
+          } else {
+            const hourStr = String(et.hour).padStart(2, "0");
+            const minStr = String(et.minute).padStart(2, "0");
+            dateStr = `${datePart} ${hourStr}:${minStr} ${dayOfWeekStr}`;
+          }
+
+          const getXNew = (idx: number) => {
+            const cWidth = candleAreaWidth / nextZoom;
+            const val = 60 + idx * cWidth + cWidth / 2;
+            return isNaN(val) || !isFinite(val) ? 0 : val;
+          };
+
+          setCrosshairPos({
+            x: getXNew(actualIndexInVisible),
+            y: svgY,
+            price: priceY,
+            dateStr,
+          });
+          setHoveredCandle({ candle, index: nextStart + actualIndexInVisible });
+        }
+      } else {
+        setCrosshairPos(null);
+        setHoveredCandle(null);
+      }
+    };
+
+    container.addEventListener("wheel", handleWheelNative, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheelNative);
+    };
+  }, [startIndex, zoomLevel, totalCandles, maxStartIndex, candles, minPrice, priceRange, isDaily, showVolume]);
+
   const handleZoomIn = () => {
     const nextZoom = Math.max(20, Math.round(zoomLevel * 0.8));
     setZoomLevel(nextZoom);
@@ -473,42 +643,48 @@ export default function PriceActionChart({
       // Check if price zone falls within current vertical bounds
       if (zone.price < minPrice || zone.price > maxPrice) return null;
       const y = getY(zone.price);
-      const minBoundY = getY(zone.minPrice);
-      const maxBoundY = getY(zone.maxPrice);
+      
+      // Dynamic narrow zone (price +- 0.04%, which is ~3 points for S&P 500 around 7500)
+      const halfRange = Math.max(1, zone.price * 0.0004);
+      const minBoundY = getY(zone.price - halfRange);
+      const maxBoundY = getY(zone.price + halfRange);
       const bandHeight = Math.max(4, Math.abs(minBoundY - maxBoundY));
 
       if (isNaN(y) || isNaN(minBoundY) || isNaN(maxBoundY) || isNaN(bandHeight)) return null;
 
       const isSupport = zone.type === "support";
       const isResistance = zone.type === "resistance";
+      
+      // No borders (stroke) - pure soft translucent colored block (色块)
       const colorClass = isSupport 
-        ? "fill-[#00c805]/5 stroke-[#00c805]/20" 
+        ? "fill-[#00c805]/10" 
         : isResistance 
-          ? "fill-[#ff3b30]/5 stroke-[#ff3b30]/20" 
-          : "fill-amber-500/5 stroke-amber-500/20";
+          ? "fill-[#ff3b30]/10" 
+          : "fill-amber-500/10";
 
       return (
         <g key={zone.id} className="transition-all duration-300">
-          {/* Main Translucent Zone Band */}
+          {/* Main Translucent Zone Band (Borderless block) */}
           <rect
             x={60}
             y={Math.min(minBoundY, maxBoundY)}
             width={candleAreaWidth}
             height={bandHeight}
-            className={`${colorClass} stroke-1`}
+            className={colorClass}
           />
-          {/* Level Dashed Line */}
+          {/* Level Dashed Line (Single Clean Line) */}
           <line
             x1={60}
             y1={y}
             x2={chartWidth}
             y2={y}
+            strokeDasharray="4,3"
             className={
               isSupport 
-                ? "stroke-[#00c805]/30 stroke-[1] stroke-dasharray-[3,3]" 
+                ? "stroke-[#00c805]/45 stroke-[1]" 
                 : isResistance 
-                  ? "stroke-[#ff3b30]/30 stroke-[1] stroke-dasharray-[3,3]" 
-                  : "stroke-amber-400/30 stroke-[1] stroke-dasharray-[3,3]"
+                  ? "stroke-[#ff3b30]/45 stroke-[1]" 
+                  : "stroke-amber-400/45 stroke-[1]"
             }
           />
           {/* Tag text */}
@@ -524,7 +700,7 @@ export default function PriceActionChart({
                   : "fill-amber-400"
             }`}
           >
-            {zone.type === "support" ? "支撑" : zone.type === "resistance" ? "阻力" : "互换"} ({zone.strength}次触碰, 21天): {zone.price}
+            {zone.type === "support" ? "支撑" : zone.type === "resistance" ? "阻力" : "互换"} ({zone.strength}次触碰, {getPeriodLabel()}): {zone.price}
           </text>
         </g>
       );
@@ -607,14 +783,34 @@ export default function PriceActionChart({
         if (isNaN(xStart) || isNaN(width) || isNaN(yTop) || isNaN(height)) return null;
 
         const isSelected = selectedPattern && selectedPattern.id === pattern.id;
-        const isBullish = pattern.type.includes("BULLISH") || pattern.type.includes("BOTTOM") || pattern.type.includes("MORNING");
+        const isPending = pattern.type === "PENDING_SIGNAL";
+        const isBullish = !isPending && (pattern.type.includes("BULLISH") || pattern.type.includes("BOTTOM") || pattern.type.includes("MORNING") || pattern.type.includes("FLAG_BULLISH") || pattern.type.includes("DOUBLE_BOTTOM"));
         
-        let borderClass = isBullish ? "stroke-[#00c805]/40" : "stroke-[#ff3b30]/40";
-        let fillClass = isBullish ? "fill-[#00c805]/[0.02]" : "fill-[#ff3b30]/[0.02]";
+        let borderClass = isPending ? "stroke-[#2663ff]/40" : (isBullish ? "stroke-[#00c805]/40" : "stroke-[#ff3b30]/40");
+        let fillClass = isPending ? "fill-[#2663ff]/[0.02]" : (isBullish ? "fill-[#00c805]/[0.02]" : "fill-[#ff3b30]/[0.02]");
 
         if (isSelected) {
-          borderClass = isBullish ? "stroke-[#00c805] stroke-[2] drop-shadow-[0_0_4px_rgba(0,200,5,0.3)]" : "stroke-[#ff3b30] stroke-[2] drop-shadow-[0_0_4px_rgba(255,59,48,0.3)]";
-          fillClass = isBullish ? "fill-[#00c805]/10" : "fill-[#ff3b30]/10";
+          borderClass = isPending 
+            ? "stroke-[#2663ff] stroke-[1.5] drop-shadow-[0_0_4px_rgba(38,99,255,0.3)]" 
+            : (isBullish 
+              ? "stroke-[#00c805] stroke-[2] drop-shadow-[0_0_4px_rgba(0,200,5,0.3)]" 
+              : "stroke-[#ff3b30] stroke-[2] drop-shadow-[0_0_4px_rgba(255,59,48,0.3)]");
+          fillClass = isPending ? "fill-[#2663ff]/8" : (isBullish ? "fill-[#00c805]/10" : "fill-[#ff3b30]/10");
+        }
+
+        const labelText = getPatternLabel(pattern.type, pattern.name);
+        const badgeWidth = labelText.length * 9.5 + 10;
+        const badgeX = xStart + (width - badgeWidth) / 2;
+        const badgeY = yTop - 15;
+
+        let badgeBgClass = isPending 
+          ? "fill-[#070d1a] stroke-[#2663ff]/40" 
+          : (isBullish ? "fill-[#132c1e] stroke-[#24593b]" : "fill-[#3a1515] stroke-[#6e2727]");
+        let textFillClass = isPending ? "fill-[#5185ff]" : (isBullish ? "fill-[#4ade80]" : "fill-[#f87171]");
+
+        if (isSelected && !isPending) {
+          badgeBgClass = "fill-[#2663ff] stroke-[#4f80ff]";
+          textFillClass = "fill-white";
         }
 
         return (
@@ -632,28 +828,46 @@ export default function PriceActionChart({
               rx={4}
               className={`${borderClass} ${fillClass} transition-all duration-200`}
             />
-            {/* Pattern Badge on Top */}
+            {/* Pattern Badge on Top - Dynamic width & premium teacher marker look */}
             <rect
-              x={xStart + (width - 70) / 2}
-              y={yTop - 12}
-              width={70}
-              height={12}
-              rx={2}
-              className={isSelected ? "fill-blue-600" : "fill-slate-800 group-hover:fill-slate-700"}
+              x={badgeX}
+              y={badgeY}
+              width={badgeWidth}
+              height={14}
+              rx={3}
+              className={`${badgeBgClass} stroke-[1] transition-all duration-200`}
             />
             <text
-              x={xStart + width / 2}
-              y={yTop - 3}
+              x={badgeX + badgeWidth / 2}
+              y={badgeY + 9.5}
               textAnchor="middle"
-              className={`font-sans text-[7px] font-bold ${isSelected ? "fill-white" : "fill-slate-300"}`}
+              className={`font-sans text-[8px] font-bold ${textFillClass}`}
             >
-              {pattern.label.split(" ")[0]}
+              {labelText}
             </text>
           </g>
         );
       })
       .filter(Boolean);
   };
+
+  const getDisplayTimeframe = () => {
+    if (!timeframe) return "5 MIN";
+    if (timeframe === "1d") return "1D";
+    if (timeframe.endsWith("m")) return timeframe.replace("m", " MIN").toUpperCase();
+    return timeframe.toUpperCase();
+  };
+
+  if (totalCandles === 0) {
+    return (
+      <div className="h-[500px] flex flex-col items-center justify-center bg-gray-950 border border-gray-800 rounded-2xl text-gray-400">
+        <div className="animate-pulse flex flex-col items-center">
+          <Layers className="w-12 h-12 text-gray-600 mb-3" />
+          <p className="text-sm">等待 K 线数据载入...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col bg-[#0c0d10] border border-[#1e222d] rounded-2xl overflow-hidden shadow-2xl">
@@ -663,7 +877,7 @@ export default function PriceActionChart({
           <span className="flex h-2 w-2 rounded-full bg-[#00c805]"></span>
           <div className="flex flex-col">
             <h3 className="text-xs font-semibold text-slate-100 flex items-center gap-2">
-              S&P 500 Index (SPX) <span className="text-[9px] bg-neutral-900 px-1.5 py-0.5 rounded text-slate-400 font-mono">5 MIN</span>
+              S&P 500 Index (SPX) <span className="text-[9px] bg-neutral-900 px-1.5 py-0.5 rounded text-slate-400 font-mono">{getDisplayTimeframe()}</span>
             </h3>
             {hoveredCandle ? (
               <p className="text-[10px] font-mono text-slate-400 flex gap-2.5 mt-0.5">
@@ -950,15 +1164,15 @@ export default function PriceActionChart({
               />
               {/* Price badge (on the left Y-axis, 0 to 60px) */}
               <g transform={`translate(2, ${Math.max(2, Math.min(totalChartHeight - 16, crosshairPos.y - 8))})`}>
-                <rect x={0} y={0} width={56} height={16} rx={3} fill="#00c805" stroke="#ffffff" strokeWidth={0.8} />
-                <text x={28} y={11} textAnchor="middle" className="fill-slate-950 font-mono text-[9px] font-extrabold">
+                <rect x={0} y={0} width={56} height={16} rx={0} fill="#ffffff" stroke="#000000" strokeWidth={1} />
+                <text x={28} y={11} textAnchor="middle" className="fill-black font-mono text-[9px] font-black">
                   {crosshairPos.price.toFixed(1)}
                 </text>
               </g>
               {/* Date/Time badge (bottom X-axis, centered on candle inside 60 to 720) */}
-              <g transform={`translate(${Math.max(60 + 50, Math.min(chartWidth - 50, crosshairPos.x)) - 50}, ${totalChartHeight + 1})`}>
-                <rect x={0} y={0} width={100} height={16} rx={3} fill="#2563eb" stroke="#ffffff" strokeWidth={0.8} />
-                <text x={50} y={11} textAnchor="middle" className="fill-white font-sans text-[8px] font-bold">
+              <g transform={`translate(${Math.max(60 + 75, Math.min(chartWidth - 75, crosshairPos.x)) - 75}, ${totalChartHeight + 1})`}>
+                <rect x={0} y={0} width={150} height={16} rx={0} fill="#ffffff" stroke="#000000" strokeWidth={1} />
+                <text x={75} y={11} textAnchor="middle" className="fill-black font-mono text-[8px] font-black">
                   {crosshairPos.dateStr}
                 </text>
               </g>

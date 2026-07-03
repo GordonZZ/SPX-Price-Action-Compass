@@ -134,7 +134,8 @@ export function detectTrend(candles: Candle[]): MarketTrend {
 export function detectSupportResistanceZones(
   candles: Candle[],
   highs: { index: number; price: number }[],
-  lows: { index: number; price: number }[]
+  lows: { index: number; price: number }[],
+  tolerancePercent = 0.0015
 ): SupportResistanceZone[] {
   if (candles.length === 0) return [];
 
@@ -149,8 +150,6 @@ export function detectSupportResistanceZones(
   const sortedPoints = [...points].sort((a, b) => a.price - b.price);
   const clusters: typeof points[] = [];
   let currentCluster: typeof points = [];
-
-  const tolerancePercent = 0.0015; // 0.15% threshold for SPX (~7-8 points)
 
   for (let i = 0; i < sortedPoints.length; i++) {
     const pt = sortedPoints[i];

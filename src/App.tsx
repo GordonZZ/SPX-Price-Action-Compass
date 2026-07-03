@@ -3,17 +3,18 @@ import PatternList from "./components/PatternList.tsx";
 import PriceActionChart from "./components/PriceActionChart.tsx";
 import ChallengeMode from "./components/ChallengeMode.tsx";
 import { Candle, DetectedPattern, SupportResistanceZone, MarketTrend, SPXDataResponse } from "./types.js";
-import { SlidersHorizontal, BookOpen, GraduationCap, Flame, RefreshCw, BarChart3, HelpCircle, Layers, Eye, EyeOff, ChevronDown, Check } from "lucide-react";
+import { SlidersHorizontal, BookOpen, GraduationCap, Flame, RefreshCw, BarChart3, HelpCircle, Layers, Eye, EyeOff, ChevronDown, Check, Filter } from "lucide-react";
 
 const PATTERN_CATEGORIES = [
   { val: "ALL", label: "全部形态" },
-  { val: "PIN_BAR", label: "针形 K线 (Pin Bar / Hammer)" },
+  { val: "NONE", label: "无 (不显示形态)" },
+  { val: "PIN_BAR", label: "针形 K线 (Pin Bar)" },
   { val: "ENGULFING", label: "吞没 K线 (Engulfing)" },
-  { val: "STAR", label: "星体反转 (Morning/Evening Star)" },
+  { val: "STAR", label: "星体反转 (Star)" },
   { val: "DOJI", label: "十字星 (Doji)" },
-  { val: "DOUBLE", label: "双顶双底 (Double Top/Bottom)" },
-  { val: "HEAD_SHOULDERS", label: "头肩结构 (Head & Shoulders)" },
-  { val: "TRIANGLE", label: "收敛整理 (Triangles)" },
+  { val: "DOUBLE", label: "双顶双底 (Double)" },
+  { val: "HEAD_SHOULDERS", label: "头肩结构 (H&S)" },
+  { val: "TRIANGLE", label: "收敛整理 (Triangle)" },
 ];
 
 export default function App() {
@@ -39,9 +40,8 @@ export default function App() {
   const [drilldownTrend, setDrilldownTrend] = useState<MarketTrend>({ direction: "SIDEWAYS", strength: 50, labels: [] });
   const [drilldownLoading, setDrilldownLoading] = useState<boolean>(false);
 
-  // Pattern Filter Selection Dropdown state
+  // Pattern Filter Selection state
   const [patternFilters, setPatternFilters] = useState<string[]>(["ENGULFING", "PIN_BAR"]);
-  const [showPatternDropdown, setShowPatternDropdown] = useState<boolean>(false);
 
   // Visibility toggles
   const [showPatterns, setShowPatterns] = useState<boolean>(true);
@@ -49,37 +49,57 @@ export default function App() {
   const [showTrends, setShowTrends] = useState<boolean>(true);
   const [showVolume, setShowVolume] = useState<boolean>(true);
 
-  // Helper to toggle pattern filters (supports multi-selection)
+  // Dropdown states & helpers
+  const [showFilterDropdown, setShowFilterDropdown] = useState<boolean>(false);
+
+  const getCategoryCount = (val: string) => {
+    if (val === "ALL") return patterns.length;
+    if (val === "NONE") return 0;
+    return patterns.filter(p => {
+      if (val === "PIN_BAR") return p.type.includes("PIN_BAR");
+      if (val === "ENGULFING") return p.type.includes("ENGULFING");
+      if (val === "STAR") return p.type.includes("STAR");
+      if (val === "DOJI") return p.type === "DOJI";
+      if (val === "DOUBLE") return p.type.includes("DOUBLE");
+      if (val === "HEAD_SHOULDERS") return p.type.includes("HEAD_AND_SHOULDERS") || p.type.includes("INVERSE_HEAD_AND_SHOULDERS");
+      if (val === "TRIANGLE") return p.type.includes("TRIANGLE");
+      return false;
+    }).length;
+  };
+
+  const getDropdownButtonLabel = () => {
+    if (patternFilters.includes("ALL")) return "全部形态";
+    if (patternFilters.includes("NONE")) return "无 (未选形态)";
+    if (patternFilters.length === 0) return "无选择";
+    const selectedLabels = PATTERN_CATEGORIES
+      .filter(c => patternFilters.includes(c.val) && c.val !== "ALL" && c.val !== "NONE")
+      .map(c => c.label.split(" ")[0]); // E.g., "针形", "吞没"
+    return selectedLabels.join(" + ");
+  };
+
   const handleTogglePatternFilter = (val: string) => {
     setShowPatterns(true); // Always enable pattern markings when filtering
     if (val === "ALL") {
       setPatternFilters(["ALL"]);
+    } else if (val === "NONE") {
+      setPatternFilters(["NONE"]);
     } else {
       setPatternFilters(prev => {
-        const withoutAll = prev.filter(x => x !== "ALL");
-        if (withoutAll.includes(val)) {
-          const updated = withoutAll.filter(x => x !== val);
+        const withoutAllOrNone = prev.filter(x => x !== "ALL" && x !== "NONE");
+        if (withoutAllOrNone.includes(val)) {
+          const updated = withoutAllOrNone.filter(x => x !== val);
           return updated.length === 0 ? ["ALL"] : updated;
         } else {
-          return [...withoutAll, val];
+          return [...withoutAllOrNone, val];
         }
       });
     }
   };
 
-  // Helper to get formatted display label for the selected patterns
-  const getDropdownButtonLabel = () => {
-    if (patternFilters.includes("ALL")) return "全部形态";
-    if (patternFilters.length === 0) return "无选择";
-    const selectedLabels = PATTERN_CATEGORIES
-      .filter(c => patternFilters.includes(c.val) && c.val !== "ALL")
-      .map(c => c.label.split(" ")[0]); // E.g., "针形", "吞没"
-    return selectedLabels.join(" + ");
-  };
-
   // Filter detected patterns based on user's active dropdown choice
   const filteredPatterns = patterns.filter(p => {
     if (patternFilters.includes("ALL")) return true;
+    if (patternFilters.includes("NONE")) return false;
     if (patternFilters.length === 0) return false;
     return patternFilters.some(filter => {
       if (filter === "PIN_BAR") return p.type.includes("PIN_BAR");
@@ -205,31 +225,32 @@ export default function App() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-[#0a0b0e] text-slate-300 flex flex-col font-sans">
+    <div className="min-h-screen bg-black text-slate-100 flex flex-col font-sans">
       
       {/* 1. Global Navigation Header */}
-      <header className="bg-[#0d0e12] border-b border-slate-800 sticky top-0 z-50 px-6 py-3">
+      <header className="bg-black/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 px-6 py-3">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           
           {/* App Branding */}
           <div className="flex flex-wrap items-center gap-4">
-            <span className="font-bold text-sm text-slate-100 tracking-tight">
+            <span className="font-bold text-sm text-white tracking-widest flex items-center gap-2 font-mono uppercase">
+              <span className="w-2.5 h-2.5 bg-white rounded-none transform rotate-45 shrink-0"></span>
               SPX Price Action Compass
             </span>
           </div>
 
           {/* Mode Tabs Switch */}
-          <div className="flex items-center bg-[#0a0b0e] p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center bg-[#0d0d11] p-1 rounded-none border border-neutral-800">
             <button
               onClick={() => setActiveTab("review")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-1.5 rounded-none text-xs font-bold tracking-widest transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                 activeTab === "review"
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/15"
-                  : "text-slate-500 hover:text-slate-300"
+                  ? "bg-white text-black font-black border border-white shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
+                  : "bg-transparent text-slate-400 hover:text-white border border-transparent hover:border-neutral-700"
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5" />
-              价格行为复盘 (Study Mode)
+              <BarChart3 className={`w-3.5 h-3.5 ${activeTab === "review" ? "text-black" : "text-slate-400"}`} />
+              价格行为诊断
             </button>
             <button
               onClick={() => {
@@ -237,27 +258,38 @@ export default function App() {
                 setSelectedPattern(null);
                 setFocusIndex(null);
               }}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-1.5 rounded-none text-xs font-bold tracking-widest transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                 activeTab === "challenge"
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/15"
-                  : "text-slate-500 hover:text-slate-300"
+                  ? "bg-white text-black font-black border border-white shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
+                  : "bg-transparent text-slate-400 hover:text-white border border-transparent hover:border-neutral-700"
               }`}
             >
-              <GraduationCap className="w-3.5 h-3.5" />
-              实战模拟对抗 (Challenge)
+              <GraduationCap className={`w-3.5 h-3.5 ${activeTab === "challenge" ? "text-black" : "text-slate-400"}`} />
+              实战模拟
             </button>
           </div>
 
           {/* Live Price Display */}
           {latestCandle && (
-            <div className="hidden lg:flex items-center gap-3 bg-[#0a0b0e]/80 border border-slate-800/60 px-3 py-1 rounded-xl">
-              <div className="text-right">
-                <div className="text-base font-mono text-[#00f2ad] font-bold leading-none">
-                  {latestCandle.close.toFixed(2)}
-                </div>
-                <div className={`text-[9px] font-bold font-mono mt-0.5 ${priceChange >= 0 ? "text-[#00f2ad]" : "text-[#ff4b5c]"}`}>
-                  {priceChange >= 0 ? "+" : ""}{priceChange.toFixed(2)} ({priceChangePct >= 0 ? "+" : ""}{priceChangePct.toFixed(2)}%)
-                </div>
+            <div className="hidden lg:flex flex-col items-end gap-0.5 px-3 py-1 rounded-lg border border-neutral-800 bg-[#0d0d11]">
+              <div className="text-[10px] font-mono text-slate-400 font-bold">
+                {(() => {
+                  try {
+                    const dateNYStr = new Date(latestCandle.time).toLocaleString("en-US", { timeZone: "America/New_York" });
+                    const dateNY = new Date(dateNYStr);
+                    const yyyy = dateNY.getFullYear();
+                    const mm = String(dateNY.getMonth() + 1).padStart(2, "0");
+                    const dd = String(dateNY.getDate()).padStart(2, "0");
+                    const hh = String(dateNY.getHours()).padStart(2, "0");
+                    const min = String(dateNY.getMinutes()).padStart(2, "0");
+                    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+                  } catch (e) {
+                    return "";
+                  }
+                })()}
+              </div>
+              <div className="text-sm font-mono font-extrabold leading-none text-[#00c805]">
+                {latestCandle.close.toFixed(2)}
               </div>
             </div>
           )}
@@ -278,13 +310,13 @@ export default function App() {
               /* TAB 1: INTERACTIVE PRICE ACTION REVIEW */
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
                 
-                {/* Column 1: Interactive SVG Candlestick Chart Stage (Left/Middle for user habit) */}
+                {/* Column 1: Interactive SVG Candlestick Chart Stage */}
                 <div className="lg:col-span-3 flex flex-col gap-4">
                   
                   {/* Chart Utility Toolbar - Clean, flat, borderless bar with NO nested cards */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 py-1.5 px-1">
+                  <div className="flex flex-wrap items-center justify-between gap-4 py-2 px-1">
                     {/* Timeframe picker - sleek flat group */}
-                    <div className="flex items-center gap-1 bg-neutral-900/60 p-1 rounded-xl border border-[#1e222d]">
+                    <div className="flex items-center gap-0.5 bg-[#0d0d11] p-0.5 rounded-none border border-neutral-800">
                       {[
                         { label: "1 min K", val: "1m" },
                         { label: "5 min K", val: "5m" },
@@ -298,10 +330,10 @@ export default function App() {
                             setTimeframe(t.val as any);
                             setDrilldownDay(null); // Reset drilldown when switching timeframe
                           }}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-semibold font-sans transition-all cursor-pointer ${
+                          className={`px-3 py-1.5 rounded-none text-[10px] font-bold tracking-wide transition-all cursor-pointer ${
                             timeframe === t.val
-                              ? "bg-[#1e222d] text-[#00c805] shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
-                              : "text-slate-400 hover:text-slate-200"
+                              ? "bg-white text-black font-black border border-white"
+                              : "text-slate-400 hover:text-white hover:bg-neutral-950"
                           }`}
                         >
                           {t.label}
@@ -311,59 +343,76 @@ export default function App() {
 
                     {/* Visibility Switches - sleek flat buttons */}
                     <div className="flex items-center gap-2">
-                      {/* Auto-detected Patterns Dropdown Menu */}
+                      {/* Support & Resistance Bands */}
+                      <button
+                        onClick={() => setShowZones(!showZones)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none border text-[10px] font-bold transition-all cursor-pointer ${
+                          showZones
+                            ? "bg-white border-white text-black font-black"
+                            : "bg-transparent border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
+                        }`}
+                        title="显示/隐藏压力支撑带"
+                      >
+                        {showZones ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        支撑/阻力
+                      </button>
+
+                      {/* Show/Hide Pattern Markings */}
+                      <button
+                        onClick={() => setShowPatterns(!showPatterns)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none border text-[10px] font-bold transition-all cursor-pointer ${
+                          showPatterns
+                            ? "bg-white border-white text-black font-black"
+                            : "bg-transparent border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
+                        }`}
+                        title="显示/隐藏图上形态标记"
+                      >
+                        {showPatterns ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        图上形态
+                      </button>
+
+                      {/* Pattern Filter Dropdown */}
                       <div className="relative">
                         <button
-                          onClick={() => setShowPatternDropdown(!showPatternDropdown)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-semibold transition-all cursor-pointer ${
-                            showPatterns
-                              ? "bg-[#00c805]/10 border-[#00c805]/20 text-[#00c805]"
-                              : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#1e222d]/30"
+                          onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none border text-[10px] font-bold transition-all cursor-pointer ${
+                            showFilterDropdown
+                              ? "bg-white border-white text-black font-black"
+                              : "bg-transparent border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                           }`}
-                          title="选择并学习不同的价格行为形态"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Filter className="w-3.5 h-3.5" />
                           <span>形态: {getDropdownButtonLabel()}</span>
-                          <ChevronDown className="w-3 h-3 ml-0.5 text-slate-400" />
+                          <ChevronDown className="w-3 h-3 ml-1 shrink-0" />
                         </button>
 
-                        {showPatternDropdown && (
+                        {showFilterDropdown && (
                           <>
                             <div 
                               className="fixed inset-0 z-40" 
-                              onClick={() => setShowPatternDropdown(false)}
+                              onClick={() => setShowFilterDropdown(false)}
                             />
-                            <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[#0c0d10] border border-[#1e222d] p-1.5 shadow-2xl z-50 animate-fade-in">
-                              <div className="px-2.5 py-1.5 text-[9px] font-mono text-slate-500 uppercase tracking-wider border-b border-[#1e222d]/50 mb-1">
-                                选择要研究的形态 (支持多选)
+                            <div className="absolute right-0 mt-1 rounded-none bg-black border border-neutral-700 p-1.5 shadow-2xl z-50 animate-fade-in w-56 max-h-[300px] overflow-y-auto">
+                              <div className="px-2 py-1 text-[9px] font-mono text-slate-500 uppercase tracking-wider border-b border-neutral-800 mb-1 text-left">
+                                选择要研究的形态 (多选)
                               </div>
-                              <button
-                                onClick={() => {
-                                  setShowPatterns(!showPatterns);
-                                  setShowPatternDropdown(false);
-                                }}
-                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors flex items-center justify-between hover:bg-[#1e222d]/60 text-slate-300"
-                              >
-                                <span>显示所有形态图示</span>
-                                <span className="text-[8px] font-mono opacity-60">{showPatterns ? "已开启" : "已关闭"}</span>
-                              </button>
-                              <div className="h-[1px] bg-[#1e222d]/50 my-1" />
                               {PATTERN_CATEGORIES.map(cat => {
                                 const isSelected = cat.val === "ALL" 
                                   ? patternFilters.includes("ALL")
                                   : patternFilters.includes(cat.val);
+                                const count = getCategoryCount(cat.val);
                                 return (
                                   <button
                                     key={cat.val}
                                     onClick={() => handleTogglePatternFilter(cat.val)}
-                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-medium transition-colors flex items-center justify-between ${
+                                    className={`w-full text-left px-2 py-1.5 rounded-none text-[10px] font-bold transition-colors flex items-center justify-between ${
                                       isSelected
-                                        ? "bg-[#00c805]/10 text-[#00c805] font-bold"
-                                        : "text-slate-400 hover:bg-[#1e222d]/40 hover:text-slate-200"
+                                        ? "bg-white text-black font-black"
+                                        : "text-slate-400 hover:bg-neutral-900 hover:text-white"
                                     }`}
                                   >
-                                    <span>{cat.label}</span>
-                                    {isSelected && <Check className="w-3.5 h-3.5 text-[#00c805]" />}
+                                    <span>{cat.label} ({count})</span>
+                                    {isSelected && <Check className="w-3 h-3 text-black" />}
                                   </button>
                                 );
                               })}
@@ -372,27 +421,13 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Support & Resistance Bands */}
-                      <button
-                        onClick={() => setShowZones(!showZones)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-semibold transition-all cursor-pointer ${
-                          showZones
-                            ? "bg-[#00c805]/10 border-[#00c805]/20 text-[#00c805]"
-                            : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#1e222d]/30"
-                        }`}
-                        title="显示/隐藏压力支撑带"
-                      >
-                        {showZones ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                        支撑/阻力
-                      </button>
-
                       {/* Trend Pivots */}
                       <button
                         onClick={() => setShowTrends(!showTrends)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-semibold transition-all cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none border text-[10px] font-bold transition-all cursor-pointer ${
                           showTrends
-                            ? "bg-amber-500/10 border-amber-500/20 text-amber-500"
-                            : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#1e222d]/30"
+                            ? "bg-white border-white text-black font-black"
+                            : "bg-transparent border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                         }`}
                         title="显示/隐藏趋势标定"
                       >
@@ -403,10 +438,10 @@ export default function App() {
                       {/* Volume toggler */}
                       <button
                         onClick={() => setShowVolume(!showVolume)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-semibold transition-all cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-none border text-[10px] font-bold transition-all cursor-pointer ${
                           showVolume
-                            ? "bg-slate-800/40 border-[#1e222d] text-slate-300"
-                            : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#1e222d]/30"
+                            ? "bg-white border-white text-black font-black"
+                            : "bg-transparent border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                         }`}
                         title="显示/隐藏成交量"
                       >
@@ -441,19 +476,19 @@ export default function App() {
 
                   {/* 5-minute Intraday Drilldown Section */}
                   {timeframe === "1d" && drilldownDay && (
-                    <div className="bg-[#0c0d10] border border-[#1e222d] rounded-2xl p-6 shadow-2xl mt-4 animate-fade-in flex flex-col gap-4">
-                      <div className="flex items-center justify-between border-b border-[#1e222d] pb-3">
+                    <div className="bg-black border border-neutral-800 rounded-none p-6 shadow-2xl mt-4 animate-fade-in flex flex-col gap-4">
+                      <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
                         <div className="flex items-center gap-3">
-                          <span className="px-2.5 py-1 bg-blue-600/20 text-blue-400 text-[10px] font-mono font-bold rounded-lg border border-blue-500/20 uppercase">
+                          <span className="px-2.5 py-1 bg-white text-black text-[10px] font-mono font-bold rounded-none border border-white uppercase">
                             日内分时 (5m)
                           </span>
-                          <h3 className="text-sm font-bold text-white font-sans">
-                            SPX 5分钟走势 analysis - <span className="text-blue-400 font-mono">{drilldownDay}</span>
+                          <h3 className="text-sm font-bold text-slate-100 font-sans">
+                            SPX 5分钟走势分析 - <span className="text-white font-mono font-bold">{drilldownDay}</span>
                           </h3>
                         </div>
                         <button
                           onClick={() => setDrilldownDay(null)}
-                          className="px-3 py-1.5 bg-neutral-950 hover:bg-neutral-900 border border-[#1e222d] text-slate-300 rounded-xl text-[10px] font-bold cursor-pointer transition-colors"
+                          className="px-3 py-1.5 bg-black hover:bg-neutral-900 active:scale-[0.98] border border-neutral-700 text-slate-200 rounded-none text-[10px] font-bold cursor-pointer transition-colors"
                         >
                           收起日内图 (Close)
                         </button>
@@ -461,17 +496,17 @@ export default function App() {
 
                       {drilldownLoading ? (
                         <div className="h-[250px] flex flex-col items-center justify-center">
-                          <div className="w-8 h-8 border-t-2 border-blue-500 border-r-2 border-transparent rounded-full animate-spin mb-3"></div>
+                          <div className="w-8 h-8 border-t-2 border-white border-r-2 border-transparent rounded-full animate-spin mb-3"></div>
                           <p className="text-xs text-slate-400 font-mono">正在抓取并组装该交易日5分钟精细 K 线...</p>
                         </div>
                       ) : drilldownCandles.length === 0 ? (
-                        <div className="h-[120px] flex items-center justify-center text-xs text-slate-500 font-sans border border-dashed border-[#1e222d] rounded-xl">
+                        <div className="h-[120px] flex items-center justify-center text-xs text-slate-500 font-sans border border-dashed border-neutral-800 rounded-none">
                           ⚠️ 未找到该交易日的日内5分钟数据（请点击近2个月内的有效美股交易日 K 线）
                         </div>
                       ) : (
                         <div className="flex flex-col gap-4">
                           {/* Intraday summary statistics card */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-[#000000] p-4 rounded-xl border border-[#1e222d]">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-black p-4 rounded-none border border-neutral-800">
                             <div>
                               <div className="text-[9px] text-slate-500 uppercase tracking-wider font-mono">日内开盘</div>
                               <div className="text-xs font-bold text-slate-200 font-mono">${drilldownCandles[0]?.open.toFixed(2)}</div>
@@ -514,6 +549,11 @@ export default function App() {
                 <div className="lg:col-span-1 h-full">
                   <PatternList
                     patterns={filteredPatterns}
+                    allPatterns={patterns}
+                    patternFilters={patternFilters}
+                    setPatternFilters={setPatternFilters}
+                    showPatterns={showPatterns}
+                    setShowPatterns={setShowPatterns}
                     zones={zones}
                     trend={trend}
                     selectedPattern={selectedPattern}
@@ -521,6 +561,7 @@ export default function App() {
                     onTriggerSync={handleTriggerSync}
                     syncing={syncing}
                     lastUpdated={lastUpdated}
+                    timeframe={timeframe}
                   />
                 </div>
               </div>
@@ -540,28 +581,16 @@ export default function App() {
       </main>
 
       {/* 3. Global Sleek Status Bar Footer */}
-      <footer className="h-10 bg-[#0d0e12] border-t border-slate-800 flex items-center justify-between px-6 text-[11px] text-slate-400 mt-auto font-mono">
+      <footer className="h-10 bg-black border-t border-neutral-800 flex items-center justify-between px-6 text-[10px] text-slate-500 mt-auto font-mono">
         <div className="flex items-center gap-4">
-          <span className="flex items-center">
-            <span className="w-1.5 h-1.5 bg-[#00f2ad] rounded-full mr-2 animate-pulse"></span> 
-            DATA ENGINE: ONLINE
-          </span>
-          <span className="text-slate-700">|</span>
-          <span>Last Fetch: <span className="text-slate-200">{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : "Pending"}</span></span>
+          <span>数据源: SPX 实时行情 (t-1)</span>
+          <span className="text-neutral-800">|</span>
+          <span>价格行为分析引擎: <span className="text-slate-400 font-sans">Al Brooks & Bob Volman 金融量化体系</span></span>
         </div>
-        <div className="flex items-center gap-6">
-          <div className="hidden sm:flex gap-4">
-            <span className="text-slate-500 uppercase font-bold tracking-tighter text-[10px]">
-              Patterns: <span className="text-slate-200">{patterns.length}</span>
-            </span>
-            <span className="text-slate-500 uppercase font-bold tracking-tighter text-[10px]">
-              Trend: <span className="text-slate-200">{trend.direction}</span>
-            </span>
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <span className="bg-slate-800/80 px-2 py-0.5 rounded text-slate-400 text-[10px]">Al Brooks Style</span>
-            <span className="bg-slate-800/80 px-2 py-0.5 rounded text-slate-400 text-[10px]">Bob Volman Style</span>
-          </div>
+        <div className="flex items-center gap-4">
+          <span>最后同步: <span className="text-slate-400">{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : "未同步"}</span></span>
+          <span className="text-neutral-800">|</span>
+          <span className="text-neutral-600">本工具仅供学术研究，不构成任何投资建议</span>
         </div>
       </footer>
     </div>
