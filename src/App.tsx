@@ -120,7 +120,12 @@ export default function App() {
     setLoading(true);
     try {
       const res = await fetch(`/api/spx-data?timeframe=${tfStr}`);
-      if (!res.ok) throw new Error("Failed to load SPX historical data");
+      if (!res.ok) throw new Error(`Failed to load SPX historical data (Status: ${res.status})`);
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON response. The dev server may still be booting.");
+      }
       
       const payload: SPXDataResponse = await res.json();
       setCandles(payload.candles);
@@ -145,7 +150,7 @@ export default function App() {
         setFocusIndex(null);
       }
     } catch (err) {
-      console.error(err);
+      console.error("[fetchData Error]:", err);
     } finally {
       setLoading(false);
     }
@@ -155,7 +160,13 @@ export default function App() {
     setDrilldownLoading(true);
     try {
       const res = await fetch(`/api/spx-data?timeframe=5m&day=${dayStr}`);
-      if (!res.ok) throw new Error("Failed to load intraday drilldown data");
+      if (!res.ok) throw new Error(`Failed to load intraday drilldown data (Status: ${res.status})`);
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON response for drilldown. The dev server may still be booting.");
+      }
+      
       const payload: SPXDataResponse = await res.json();
       setDrilldownCandles(payload.candles);
       setDrilldownPatterns(payload.patterns);
@@ -192,14 +203,19 @@ export default function App() {
     setSyncing(true);
     try {
       const res = await fetch("/api/spx-sync", { method: "POST" });
-      if (!res.ok) throw new Error("Failed to sync database");
+      if (!res.ok) throw new Error(`Failed to sync database (Status: ${res.status})`);
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned non-JSON response during sync.");
+      }
       
       const payload = await res.json();
       setLastUpdated(payload.lastUpdated);
       // Re-fetch current visible timeline
       await fetchData();
     } catch (err) {
-      console.error(err);
+      console.error("[handleTriggerSync Error]:", err);
     } finally {
       setSyncing(false);
     }

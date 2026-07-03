@@ -148,118 +148,130 @@ app.use(express.json({ limit: "10mb" }));
 
 // 1. API Endpoint: Fetch candles + auto-recognized patterns and zones
 app.get("/api/spx-data", async (req, res) => {
-  const timeframe = (req.query.timeframe as Timeframe) || "5m";
-  const dayParam = req.query.day as string; // YYYY-MM-DD
-  
-  if (!TIMEFRAMES.includes(timeframe)) {
-    return res.status(400).json({ error: "Invalid timeframe parameter" });
-  }
+  try {
+    const timeframe = (req.query.timeframe as Timeframe) || "5m";
+    const dayParam = req.query.day as string; // YYYY-MM-DD
+    
+    if (!TIMEFRAMES.includes(timeframe)) {
+      return res.status(400).json({ error: "Invalid timeframe parameter" });
+    }
 
-  // Auto sync if stale (older than 15 minutes)
-  const now = Date.now();
-  if (now - lastSyncTimes[timeframe] > 15 * 60 * 1000) {
-    console.log(`[API] Cache stale for ${timeframe}. Triggering background sync...`);
-    syncTimeframe(timeframe).catch(err => console.error("Stale sync error:", err));
-  }
+    // Auto sync if stale (older than 15 minutes)
+    const now = Date.now();
+    if (now - lastSyncTimes[timeframe] > 15 * 60 * 1000) {
+      console.log(`[API] Cache stale for ${timeframe}. Triggering background sync...`);
+      syncTimeframe(timeframe).catch(err => console.error("Stale sync error:", err));
+    }
 
-  const candles = caches[timeframe];
+    const candles = caches[timeframe] || [];
 
-  // Filter up to T-1 day by default (exclude today's New York date)
-  const nyTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
-  const nowNY = new Date(nyTimeStr);
-  const todayNYFormatted = `${nowNY.getFullYear()}-${String(nowNY.getMonth() + 1).padStart(2, "0")}-${String(nowNY.getDate()).padStart(2, "0")}`;
+    // Filter up to T-1 day by default (exclude today's New York date)
+    const nyTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+    const nowNY = new Date(nyTimeStr);
+    const todayNYFormatted = `${nowNY.getFullYear()}-${String(nowNY.getMonth() + 1).padStart(2, "0")}-${String(nowNY.getDate()).padStart(2, "0")}`;
 
-  const upToTMinus1Candles = candles.filter(c => {
-    const candleNYStr = new Date(c.time).toLocaleString("en-US", { timeZone: "America/New_York" });
-    const candleNY = new Date(candleNYStr);
-    const candleNYFormatted = `${candleNY.getFullYear()}-${String(candleNY.getMonth() + 1).padStart(2, "0")}-${String(candleNY.getDate()).padStart(2, "0")}`;
-    return candleNYFormatted < todayNYFormatted;
-  });
-
-  const finalCandles = upToTMinus1Candles.length > 0 ? upToTMinus1Candles : candles;
-  let filtered: Candle[] = [];
-
-  // If we are looking for a specific day's 5m intraday chart
-  if (timeframe === "5m" && dayParam) {
-    filtered = caches["5m"].filter(c => {
+    const upToTMinus1Candles = candles.filter(c => {
+      if (!c || typeof c.time !== "number") return false;
       const candleNYStr = new Date(c.time).toLocaleString("en-US", { timeZone: "America/New_York" });
       const candleNY = new Date(candleNYStr);
       const candleNYFormatted = `${candleNY.getFullYear()}-${String(candleNY.getMonth() + 1).padStart(2, "0")}-${String(candleNY.getDate()).padStart(2, "0")}`;
-      return candleNYFormatted === dayParam;
+      return candleNYFormatted < todayNYFormatted;
     });
 
-    // If no data found for that specific day, fallback to latest 5m candles
-    if (filtered.length === 0) {
-      filtered = finalCandles.slice(-390); // default to 1 day (~390 candles of 5m)
+    const finalCandles = upToTMinus1Candles.length > 0 ? upToTMinus1Candles : candles;
+    let filtered: Candle[] = [];
+
+    // If we are looking for a specific day's 5m intraday chart
+    if (timeframe === "5m" && dayParam) {
+      filtered = (caches["5m"] || []).filter(c => {
+        if (!c || typeof c.time !== "number") return false;
+        const candleNYStr = new Date(c.time).toLocaleString("en-US", { timeZone: "America/New_York" });
+        const candleNY = new Date(candleNYStr);
+        const candleNYFormatted = `${candleNY.getFullYear()}-${String(candleNY.getMonth() + 1).padStart(2, "0")}-${String(candleNY.getDate()).padStart(2, "0")}`;
+        return candleNYFormatted === dayParam;
+      });
+
+      // If no data found for that specific day, fallback to latest 5m candles
+      if (filtered.length === 0) {
+        filtered = finalCandles.slice(-390); // default to 1 day (~390 candles of 5m)
+      }
+    } else {
+      // Standard timeframe slicing
+      if (timeframe === "1m") {
+        filtered = finalCandles.slice(-1500); // 4 days of 1-minute
+      } else if (timeframe === "5m") {
+        filtered = finalCandles.slice(-1500); // 19 days of 5-minute
+      } else if (timeframe === "15m") {
+        filtered = finalCandles.slice(-1500); // 57 days of 15-minute
+      } else if (timeframe === "4h") {
+        filtered = finalCandles.slice(-1000); // Plenty of 4h candles
+      } else if (timeframe === "1d") {
+        filtered = finalCandles.slice(-1200); // Full 3 years history
+      }
     }
-  } else {
-    // Standard timeframe slicing
-    if (timeframe === "1m") {
-      filtered = finalCandles.slice(-1500); // 4 days of 1-minute
-    } else if (timeframe === "5m") {
-      filtered = finalCandles.slice(-1500); // 19 days of 5-minute
-    } else if (timeframe === "15m") {
-      filtered = finalCandles.slice(-1500); // 57 days of 15-minute
+
+    // Run server-side patterns and indicators
+    const trend = detectTrend(filtered);
+    const patterns = detectPatterns(filtered);
+
+    // S&R zones are calculated from a timeframe-appropriate historical window with adaptive swing parameters and tolerances.
+    let zonesCandlesCount = 150;
+    let swingStrength = 5;
+    let tolerancePercent = 0.0015;
+
+    if (timeframe === "1d") {
+      zonesCandlesCount = 750; // Over 3 years of daily peaks/troughs
+      swingStrength = 6;
+      tolerancePercent = 0.005; // 0.5% clustering for daily
     } else if (timeframe === "4h") {
-      filtered = finalCandles.slice(-1000); // Plenty of 4h candles
-    } else if (timeframe === "1d") {
-      filtered = finalCandles.slice(-1200); // Full 3 years history
+      zonesCandlesCount = 300; // Rich window of 300 bars
+      swingStrength = 5;
+      tolerancePercent = 0.004; // 0.4% clustering for 4h
+    } else if (timeframe === "15m") {
+      zonesCandlesCount = 200;
+      swingStrength = 5;
+      tolerancePercent = 0.002; // 0.2% clustering
+    } else if (timeframe === "5m") {
+      zonesCandlesCount = 150; // Double original density
+      swingStrength = 4;
+      tolerancePercent = 0.0015; // 0.15%
+    } else if (timeframe === "1m") {
+      zonesCandlesCount = 390;
+      swingStrength = 5;
+      tolerancePercent = 0.001; // 0.1% for high resolution 1m
     }
+
+    const zonesBaseCandles = finalCandles.slice(-zonesCandlesCount);
+    const finalZonesCandles = zonesBaseCandles.length > 0 ? zonesBaseCandles : filtered;
+    const { highs: zoneHighs, lows: zoneLows } = findSwingPoints(finalZonesCandles, swingStrength, swingStrength);
+    const zones = detectSupportResistanceZones(finalZonesCandles, zoneHighs, zoneLows, tolerancePercent);
+
+    res.json({
+      candles: filtered,
+      patterns,
+      zones,
+      trend,
+      lastUpdated: new Date(lastSyncTimes[timeframe] || Date.now()).toISOString(),
+    });
+  } catch (error: any) {
+    console.error("[API Error] in /api/spx-data:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
   }
-
-  // Run server-side patterns and indicators
-  const trend = detectTrend(filtered);
-  const patterns = detectPatterns(filtered);
-
-  // S&R zones are calculated from a timeframe-appropriate historical window with adaptive swing parameters and tolerances.
-  let zonesCandlesCount = 150;
-  let swingStrength = 5;
-  let tolerancePercent = 0.0015;
-
-  if (timeframe === "1d") {
-    zonesCandlesCount = 750; // Over 3 years of daily peaks/troughs
-    swingStrength = 6;
-    tolerancePercent = 0.005; // 0.5% clustering for daily
-  } else if (timeframe === "4h") {
-    zonesCandlesCount = 300; // Rich window of 300 bars
-    swingStrength = 5;
-    tolerancePercent = 0.004; // 0.4% clustering for 4h
-  } else if (timeframe === "15m") {
-    zonesCandlesCount = 200;
-    swingStrength = 5;
-    tolerancePercent = 0.002; // 0.2% clustering
-  } else if (timeframe === "5m") {
-    zonesCandlesCount = 150; // Double original density
-    swingStrength = 4;
-    tolerancePercent = 0.0015; // 0.15%
-  } else if (timeframe === "1m") {
-    zonesCandlesCount = 390;
-    swingStrength = 5;
-    tolerancePercent = 0.001; // 0.1% for high resolution 1m
-  }
-
-  const zonesBaseCandles = finalCandles.slice(-zonesCandlesCount);
-  const finalZonesCandles = zonesBaseCandles.length > 0 ? zonesBaseCandles : filtered;
-  const { highs: zoneHighs, lows: zoneLows } = findSwingPoints(finalZonesCandles, swingStrength, swingStrength);
-  const zones = detectSupportResistanceZones(finalZonesCandles, zoneHighs, zoneLows, tolerancePercent);
-
-  res.json({
-    candles: filtered,
-    patterns,
-    zones,
-    trend,
-    lastUpdated: new Date(lastSyncTimes[timeframe] || Date.now()).toISOString(),
-  });
 });
 
 // 2. API Endpoint: Manually trigger database sync
 app.post("/api/spx-sync", async (req, res) => {
-  // Trigger sync in the background so that the client request doesn't time out
-  syncAllTimeframes()
-    .then(() => console.log("[Sync] Manual sync complete in background."))
-    .catch(err => console.error("[Sync] Manual sync background error:", err));
+  try {
+    // Trigger sync in the background so that the client request doesn't time out
+    syncAllTimeframes()
+      .then(() => console.log("[Sync] Manual sync complete in background."))
+      .catch(err => console.error("[Sync] Manual sync background error:", err));
 
-  res.json({ success: true, lastUpdated: new Date().toISOString() });
+    res.json({ success: true, lastUpdated: new Date().toISOString() });
+  } catch (error: any) {
+    console.error("[API Error] in /api/spx-sync:", error);
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
 });
 
 // Vite & Static file serving setup
