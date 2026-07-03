@@ -5,7 +5,7 @@ import PatternList from "./components/PatternList.tsx";
 import PriceActionChart from "./components/PriceActionChart.tsx";
 import ChallengeMode from "./components/ChallengeMode.tsx";
 import { Candle, DetectedPattern, SupportResistanceZone, MarketTrend, SPXDataResponse } from "./types.js";
-import { SlidersHorizontal, BookOpen, GraduationCap, Flame, RefreshCw, BarChart3, HelpCircle, Layers, Eye, EyeOff, ChevronDown, Check, Filter, Sparkles, TrendingUp, ChevronRight } from "lucide-react";
+import { SlidersHorizontal, BookOpen, GraduationCap, Flame, RefreshCw, BarChart3, HelpCircle, Layers, Eye, EyeOff, ChevronDown, Check, Filter, Sparkles, TrendingUp, ChevronRight, Clock, Grid, Triangle, ArrowUpDown } from "lucide-react";
 import DiagnosticModal from "./components/DiagnosticModal.tsx";
 
 const PATTERN_CATEGORIES = [
@@ -353,9 +353,10 @@ export default function App() {
                         <button
                           onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
                           className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-1.5 px-2.5 py-1.5 bg-[#0d0d11] hover:bg-[#1a1a24] text-white border border-neutral-800 rounded-md text-[10px] sm:text-xs font-bold tracking-wide transition-all cursor-pointer min-h-[32px]"
-                          title="选择时间周期"
+                          title="选择 K 线时间周期 (1m, 5m, 15m, 4h, 1D)"
                         >
-                          <span className="font-mono">时间周期: {timeframe.toUpperCase() === "1D" ? "日K" : timeframe}</span>
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-mono">{timeframe.toUpperCase() === "1D" ? "1D" : timeframe}</span>
                           <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                         </button>
                         
@@ -402,56 +403,56 @@ export default function App() {
                       {/* S/R Toggle */}
                       <button
                         onClick={() => setShowZones(!showZones)}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
                           showZones
                             ? "bg-white border-white text-black font-black"
                             : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                         }`}
-                        title="支撑/阻力"
+                        title="显示/隐藏 支撑与阻力关键水位共识"
                       >
-                        <Layers className="w-3 h-3" />
+                        <Grid className="w-3.5 h-3.5" />
                         <span className="hidden xs:inline">支撑/阻力</span>
                       </button>
 
                       {/* Patterns Toggle */}
                       <button
                         onClick={() => setShowPatterns(!showPatterns)}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
                           showPatterns
                             ? "bg-white border-white text-black font-black"
                             : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                         }`}
-                        title="图上形态"
+                        title="显示/隐藏 图表自动识别价格行为形态"
                       >
-                        <Sparkles className="w-3 h-3" />
+                        <Triangle className="w-3.5 h-3.5" />
                         <span className="hidden xs:inline">图上形态</span>
                       </button>
 
                       {/* Trends (HH/LL) Toggle */}
                       <button
                         onClick={() => setShowTrends(!showTrends)}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
                           showTrends
                             ? "bg-white border-white text-black font-black"
                             : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                         }`}
-                        title="趋势标定 (HH / LL)"
+                        title="显示/隐藏 趋势高低波段标定 (HH / LL / LH / HL)"
                       >
-                        <TrendingUp className="w-3 h-3" />
+                        <ArrowUpDown className="w-3.5 h-3.5" />
                         <span className="hidden xs:inline">HH/LL</span>
                       </button>
 
                       {/* Volume Toggle */}
                       <button
                         onClick={() => setShowVolume(!showVolume)}
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
                           showVolume
                             ? "bg-white border-white text-black font-black"
                             : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                         }`}
-                        title="成交量"
+                        title="显示/隐藏 底部成交量分布图"
                       >
-                        <BarChart3 className="w-3 h-3" />
+                        <BarChart3 className="w-3.5 h-3.5" />
                         <span className="hidden xs:inline">成交量</span>
                       </button>
 
@@ -459,14 +460,14 @@ export default function App() {
                       <div className="relative flex-1 sm:flex-initial">
                         <button
                           onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                          className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
+                          className={`w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] ${
                             showFilterDropdown
                               ? "bg-white border-white text-black font-black"
                               : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
                           }`}
-                          title="形态筛选"
+                          title="筛选要显示的特定 K 线价格形态"
                         >
-                          <Filter className="w-3 h-3" />
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
                           <span className="hidden xs:inline">筛选</span>
                         </button>
 

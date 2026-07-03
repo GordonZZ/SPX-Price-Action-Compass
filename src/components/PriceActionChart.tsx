@@ -69,6 +69,15 @@ export default function PriceActionChart({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const [showMobileTip, setShowMobileTip] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowMobileTip(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Calculate dynamic right-side blank padding and start index bound
   const rightPadding = Math.max(8, Math.floor(zoomLevel * 0.15));
   const maxStartIndex = Math.max(0, totalCandles - zoomLevel + rightPadding);
@@ -1003,17 +1012,13 @@ export default function PriceActionChart({
 
         {/* Price Action Details - clean and responsive */}
         <div className="min-h-[16px] flex items-center justify-start sm:justify-end">
-          {hoveredCandle ? (
+          {hoveredCandle && (
             <p className="text-[9px] sm:text-[10px] font-mono text-slate-400 flex flex-wrap gap-x-2 gap-y-0.5">
               <span>时间: <b className="text-slate-200">{new Date(hoveredCandle.candle.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b></span>
               <span>开: <b className="text-[#00c805]">{hoveredCandle.candle.open}</b></span>
               <span>高: <b className="text-[#00c805]">{hoveredCandle.candle.high}</b></span>
               <span>低: <b className="text-[#ff3b30]">{hoveredCandle.candle.low}</b></span>
               <span>收: <b className={hoveredCandle.candle.close >= hoveredCandle.candle.open ? "text-[#00c805]" : "text-[#ff3b30]"}>{hoveredCandle.candle.close}</b></span>
-            </p>
-          ) : (
-            <p className="hidden sm:inline-block text-[10px] text-slate-500">
-              提示：长按或悬停 K 线查看细节，拖动平移
             </p>
           )}
         </div>
@@ -1059,6 +1064,31 @@ export default function PriceActionChart({
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
+        </div>
+
+        {/* Market Trend Badge in Top-Right of K-line canvas */}
+        <div className="absolute top-3 right-4 flex items-center gap-1.5 bg-neutral-900/95 backdrop-blur-sm px-2 py-1 rounded border border-[#1e222d] shadow-lg z-20 pointer-events-none select-none">
+          <span className="text-[9px] font-mono font-medium text-slate-400">
+            TREND:
+          </span>
+          <span className={`flex items-center gap-1 text-[9px] font-mono font-bold px-1 py-0.5 rounded ${
+            trend.direction === "UP" 
+              ? "bg-[#132c1e] text-[#4ade80] border border-[#24593b]" 
+              : trend.direction === "DOWN" 
+                ? "bg-[#3a1515] text-[#f87171] border border-[#6e2727]" 
+                : "bg-neutral-800 text-slate-300 border border-neutral-700"
+          }`}>
+            {trend.direction === "UP" && "↑ 看涨"}
+            {trend.direction === "DOWN" && "↓ 看跌"}
+            {trend.direction === "SIDEWAYS" && "⋅ 平稳"}
+          </span>
+        </div>
+
+        {/* Floating fade-out mobile instruction overlay */}
+        <div className={`absolute bottom-16 left-1/2 -translate-x-1/2 bg-neutral-900/95 border border-neutral-800 text-[10px] text-slate-300 px-3 py-1.5 rounded-full shadow-2xl z-30 pointer-events-none transition-opacity duration-1000 sm:hidden ${
+          showMobileTip ? "opacity-100" : "opacity-0"
+        }`}>
+          📱 提示：单指左右拖动平移，双指捏合缩放 K 线
         </div>
         <svg
           viewBox={`0 0 ${chartWidth} ${totalChartHeight + 20}`}
