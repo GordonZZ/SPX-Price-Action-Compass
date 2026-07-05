@@ -118,18 +118,18 @@ export default function PatternList({
         const zoneMeta = getZonePeriodLabel();
 
         return (
-          <div className="bg-black border border-neutral-800 rounded-none p-5 shadow-2xl text-left transition-all relative">
-            <h4 className="text-xs font-semibold text-slate-100 mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-white font-medium tracking-widest font-mono uppercase">
-                <Layers className="w-3.5 h-3.5 text-white" />
+          <div className="bg-black border border-neutral-800 rounded-none p-3 sm:p-5 shadow-2xl text-left transition-all relative">
+            <h4 className="text-[10px] sm:text-xs font-semibold text-slate-100 mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1 sm:gap-1.5 text-white font-medium tracking-widest font-mono uppercase">
+                <Layers className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-white" />
                 支撑与阻力
               </span>
               
               {/* Hoverable Information Tag */}
               <div className="relative group/tag">
-                <span className="text-[9px] bg-neutral-900 text-white px-2 py-0.5 rounded-none font-mono border border-neutral-700 font-bold flex items-center gap-1 cursor-help">
+                <span className="text-[8px] sm:text-[9px] bg-neutral-900 text-white px-1.5 sm:px-2 py-0.5 rounded-none font-mono border border-neutral-700 font-bold flex items-center gap-0.5 sm:gap-1 cursor-help">
                   {zoneMeta.tag}
-                  <Info className="w-2.5 h-2.5 text-white" />
+                  <Info className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
                 </span>
                 
                 {/* Tooltip on Hover */}
@@ -139,7 +139,7 @@ export default function PatternList({
               </div>
             </h4>
 
-            <div className="grid grid-cols-2 gap-2 mt-4">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mt-2 sm:mt-4">
               {zones.length === 0 ? (
                 <p className="col-span-2 text-[10px] text-slate-500 text-center py-4 font-mono">
                   暂未检测到筹码共识关键位，平移图表即可触发计算
@@ -151,7 +151,7 @@ export default function PatternList({
                   return (
                     <div
                       key={z.id}
-                      className={`p-3 rounded-none border text-center transition-all ${
+                      className={`p-1.5 sm:p-3 rounded-none border text-center transition-all ${
                         isSupport
                           ? "bg-black border-[#00c805] text-[#00c805] shadow-sm"
                           : isResistance
@@ -159,12 +159,12 @@ export default function PatternList({
                             : "bg-black border-neutral-800 text-slate-200"
                       }`}
                     >
-                      <p className="text-[8px] text-slate-400 uppercase font-bold tracking-wider font-mono">
+                      <p className="text-[7px] sm:text-[8px] text-slate-400 uppercase font-bold tracking-wider font-mono">
                         {z.type === "flip" ? "多空互换" : z.type === "support" ? "买方支撑" : "卖方阻力"}
                       </p>
-                      <h5 className="text-xs font-mono font-bold mt-1 text-white">${z.price}</h5>
-                      <p className="text-[8px] text-slate-400 font-mono mt-0.5 opacity-80">
-                        共识触碰: {z.strength} 次
+                      <h5 className="text-[10px] sm:text-xs font-mono font-bold mt-0.5 sm:mt-1 text-white">${z.price}</h5>
+                      <p className="text-[7px] sm:text-[8px] text-slate-400 font-mono mt-0.5 opacity-80">
+                        共识: {z.strength}次
                       </p>
                     </div>
                   );
@@ -178,20 +178,20 @@ export default function PatternList({
 
 
       {/* 3. Detected Pattern Waves */}
-      <div className="bg-black border border-neutral-800 rounded-none p-5 shadow-2xl flex flex-col gap-4 text-left transition-all">
+      <div className="bg-black border border-neutral-800 rounded-none p-3 sm:p-5 shadow-2xl flex flex-col gap-3 sm:gap-4 text-left transition-all">
         
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-          <h4 className="text-xs font-bold text-slate-100 flex items-center gap-1.5 text-white tracking-widest uppercase font-mono">
-            <Search className="w-3.5 h-3.5 text-white" />
+        <div className="flex items-center justify-between border-b border-neutral-800 pb-2 sm:pb-3">
+          <h4 className="text-[10px] sm:text-xs font-bold text-slate-100 flex items-center gap-1 sm:gap-1.5 text-white tracking-widest uppercase font-mono">
+            <Search className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-white" />
             历史信号监测
           </h4>
           <button
             onClick={onTriggerSync}
             disabled={syncing}
-            className="px-3 py-2 sm:py-1 rounded-none bg-black hover:bg-neutral-900 active:scale-[0.98] text-white font-bold disabled:opacity-50 transition-all flex items-center justify-center gap-1 text-[10px] sm:text-[9px] border border-neutral-700 cursor-pointer min-h-[44px] sm:min-h-0"
+            className="px-2 sm:px-3 py-1.5 sm:py-1 rounded-none bg-black hover:bg-neutral-900 active:scale-[0.98] text-white font-bold disabled:opacity-50 transition-all flex items-center justify-center gap-1 text-[9px] sm:text-[9px] border border-neutral-700 cursor-pointer min-h-[36px] sm:min-h-0"
             title="拉取最新 SPX 真实K线"
           >
-            <RefreshCw className={`w-2.5 h-2.5 ${syncing ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-2 h-2 sm:w-2.5 sm:h-2.5 ${syncing ? "animate-spin" : ""}`} />
             {syncing ? "同步中" : "同步数据"}
           </button>
         </div>
@@ -228,25 +228,25 @@ export default function PatternList({
                   <div
                     key={p.id}
                     onClick={() => onSelectPattern(p)}
-                    className={`p-3.5 text-left cursor-pointer transition-all flex items-center justify-between rounded-none border text-xs gap-3 ${
+                    className={`p-2 sm:p-3.5 text-left cursor-pointer transition-all flex items-center justify-between rounded-none border text-[11px] sm:text-xs gap-2 sm:gap-3 ${
                       isSel
                         ? "bg-neutral-900 border-white border-l-[4px] " + leftBorder + " shadow-md"
                         : "bg-black border-neutral-800 hover:bg-neutral-900 hover:border-white"
                     }`}
                   >
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center gap-1.5 justify-start">
+                      <div className="flex items-center gap-1 sm:gap-1.5 justify-start">
                         <span className="font-bold text-white truncate text-left font-mono">
                           {getPatternDisplayLabel(p.type, p.name)}
                         </span>
                       </div>
-                      <div className="text-[9px] text-slate-400 font-mono mt-1 flex items-center gap-1.5 justify-start">
+                      <div className="text-[8px] sm:text-[9px] text-slate-400 font-mono mt-0.5 sm:mt-1 flex items-center gap-1 sm:gap-1.5 justify-start">
                         <span>临界价: ${p.price}</span>
                         <span>·</span>
                         <span className={`${accentColor} font-bold`}>权重: {Math.round(p.confidence * 100)}%</span>
                       </div>
                     </div>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-white shrink-0 opacity-80" />
+                    <ArrowUpRight className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-white shrink-0 opacity-80" />
                   </div>
                 );
               })}
@@ -256,7 +256,7 @@ export default function PatternList({
             {patterns.length > 4 && (
               <button
                 onClick={() => setShowAllBehaviors(!showAllBehaviors)}
-                className="w-full py-2.5 sm:py-2 border border-dashed border-neutral-800 hover:border-white text-slate-400 hover:text-white text-[10px] font-mono rounded-none transition-all flex items-center justify-center gap-1 cursor-pointer mt-1 min-h-[44px] sm:min-h-0"
+                className="w-full py-2 sm:py-2 border border-dashed border-neutral-800 hover:border-white text-slate-400 hover:text-white text-[9px] sm:text-[10px] font-mono rounded-none transition-all flex items-center justify-center gap-1 cursor-pointer mt-1 min-h-[36px] sm:min-h-0"
               >
                 {showAllBehaviors ? (
                   <>

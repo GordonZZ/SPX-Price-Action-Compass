@@ -155,13 +155,13 @@ export default function App() {
       }
       setLoading(false);
     } catch (err) {
-      console.error("[fetchData Error]:", err);
       if (retries > 0) {
-        console.log(`Retrying fetchData in ${delayMs}ms... (${retries} attempts left)`);
+        console.warn(`[fetchData Warning] Failed to fetch, retrying in ${delayMs}ms... (${retries} attempts left). Error:`, err);
         setTimeout(() => {
           fetchData(tfStr, retries - 1, delayMs);
         }, delayMs);
       } else {
+        console.error("[fetchData Error] All fetch retries failed:", err);
         setLoading(false);
       }
     }
@@ -257,22 +257,22 @@ export default function App() {
     <div className="min-h-screen bg-black text-slate-100 flex flex-col font-sans">
       
       {/* 1. Global Navigation Header */}
-      <header className="bg-black/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 px-6 py-3">
+      <header className="bg-black/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 px-3 py-2 sm:px-6 sm:py-3">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           
           {/* App Branding */}
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* Premium Custom Image Logo with Dark Mode Compatibility */}
-              <div className="relative w-9 h-9 flex items-center justify-center bg-white border border-neutral-800 rounded-md shadow-[0_1px_3px_rgba(0,0,0,0.4)] overflow-hidden group hover:scale-105 transition-all duration-300">
+              <div className="relative w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center bg-white border border-neutral-800 rounded-md shadow-[0_1px_3px_rgba(0,0,0,0.4)] overflow-hidden group hover:scale-105 transition-all duration-300">
                 <img 
                   src={paLogo} 
                   alt="Price Action Compass Logo" 
-                  className="w-7 h-7 object-contain"
+                  className="w-5.5 h-5.5 sm:w-7 sm:h-7 object-contain"
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <span className="font-bold text-sm text-white tracking-widest font-mono uppercase">
+              <span className="font-bold text-[11px] sm:text-sm text-white tracking-wider sm:tracking-widest font-mono uppercase">
                 SPX Price Action Compass
               </span>
             </div>
@@ -351,191 +351,6 @@ export default function App() {
                 
                 {/* Column 1: Interactive SVG Candlestick Chart Stage */}
                 <div className="lg:col-span-3 flex flex-col gap-4">
-                  
-                  {/* Chart Utility Toolbar - Clean, flat, borderless bar with NO nested cards */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 py-1 px-1 w-full relative">
-                    
-                    {/* Timeframe picker - sleek collapsed select button */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="relative shrink-0">
-                        <button
-                          onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#0d0d11] hover:bg-[#1a1a24] text-white border border-neutral-800 rounded-md text-[10px] sm:text-xs font-bold tracking-wide transition-all cursor-pointer min-h-[32px] shrink-0"
-                          title="选择 K 线时间周期 (1m, 5m, 15m, 4h, 1D)"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-mono">{timeframe.toUpperCase() === "1D" ? "1D" : timeframe}</span>
-                          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                        </button>
-                        
-                        {showTimeframeDropdown && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-40" 
-                              onClick={() => setShowTimeframeDropdown(false)}
-                            />
-                            <div className="absolute left-0 mt-1 rounded-md bg-[#0d0d11] border border-neutral-700 p-1 shadow-2xl z-50 animate-fade-in w-full sm:w-36">
-                              {[
-                                { label: "1 min K (1m)", val: "1m" },
-                                { label: "5 min K (5m)", val: "5m" },
-                                { label: "15 min K (15m)", val: "15m" },
-                                { label: "4h K (4h)", val: "4h" },
-                                { label: "日 K (1d)", val: "1d" },
-                              ].map(t => (
-                                <button
-                                  key={t.val}
-                                  onClick={() => {
-                                    setTimeframe(t.val as any);
-                                    setDrilldownDay(null);
-                                    setShowTimeframeDropdown(false);
-                                  }}
-                                  className={`w-full text-left px-2.5 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-between min-h-[28px] ${
-                                    timeframe === t.val
-                                      ? "bg-white text-black font-black"
-                                      : "text-slate-400 hover:bg-neutral-900 hover:text-white"
-                                  }`}
-                                >
-                                  <span>{t.label}</span>
-                                  {timeframe === t.val && <Check className="w-3 h-3 text-black" />}
-                                </button>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Sleek Apple-style K-line color mode switch */}
-                      <button
-                        onClick={() => setIsChineseStyle(!isChineseStyle)}
-                        className="group flex items-center justify-center gap-2 h-8 px-2.5 bg-[#0d0d11] hover:bg-[#13131c] border border-neutral-800 hover:border-neutral-700 rounded-full transition-all cursor-pointer select-none shrink-0"
-                        title={isChineseStyle ? "当前：红涨绿跌 (点击切换为国际标准)" : "当前：绿涨红跌 (点击切换为国内习惯)"}
-                      >
-                        <span className="flex items-center gap-1">
-                          <span 
-                            className={`w-1.5 h-4.5 rounded-full transition-all duration-300 ${
-                              isChineseStyle ? "bg-[#ff3b30] shadow-[0_0_6px_rgba(255,59,48,0.4)]" : "bg-[#00c805] shadow-[0_0_6px_rgba(0,200,5,0.4)]"
-                            }`} 
-                          />
-                          <span 
-                            className={`w-1.5 h-4.5 rounded-full transition-all duration-300 ${
-                              isChineseStyle ? "bg-[#00c805] shadow-[0_0_6px_rgba(0,200,5,0.4)]" : "bg-[#ff3b30] shadow-[0_0_6px_rgba(255,59,48,0.4)]"
-                            }`} 
-                          />
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Functional Toolbar - sleek row of square/iconic controls with active highlights */}
-                    <div className="flex items-center gap-1.5 py-0.5 shrink-0 ml-auto">
-                      
-                      {/* S/R Toggle */}
-                      <button
-                        onClick={() => setShowZones(!showZones)}
-                        className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] shrink-0 ${
-                          showZones
-                            ? "bg-white border-white text-black font-black"
-                            : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
-                        }`}
-                        title="显示/隐藏 支撑与阻力关键水位共识"
-                      >
-                        <Grid className="w-3.5 h-3.5" />
-                        <span className="hidden xs:inline">支撑/阻力</span>
-                      </button>
-
-                      {/* Patterns Toggle */}
-                      <button
-                        onClick={() => setShowPatterns(!showPatterns)}
-                        className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] shrink-0 ${
-                          showPatterns
-                            ? "bg-white border-white text-black font-black"
-                            : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
-                        }`}
-                        title="显示/隐藏 图表自动识别价格行为形态"
-                      >
-                        <Triangle className="w-3.5 h-3.5" />
-                        <span className="hidden xs:inline">图上形态</span>
-                      </button>
-
-                      {/* Trends (HH/LL) Toggle */}
-                      <button
-                        onClick={() => setShowTrends(!showTrends)}
-                        className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] shrink-0 ${
-                          showTrends
-                            ? "bg-white border-white text-black font-black"
-                            : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
-                        }`}
-                        title="显示/隐藏 趋势高低波段标定 (HH / LL / LH / HL)"
-                      >
-                        <ArrowUpDown className="w-3.5 h-3.5" />
-                        <span className="hidden xs:inline">HH/LL</span>
-                      </button>
-
-                      {/* Volume Toggle */}
-                      <button
-                        onClick={() => setShowVolume(!showVolume)}
-                        className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] shrink-0 ${
-                          showVolume
-                            ? "bg-white border-white text-black font-black"
-                            : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
-                        }`}
-                        title="显示/隐藏 底部成交量分布图"
-                      >
-                        <BarChart3 className="w-3.5 h-3.5" />
-                        <span className="hidden xs:inline">成交量</span>
-                      </button>
-
-                      {/* Pattern Filter Button */}
-                      <div className="relative shrink-0">
-                        <button
-                          onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                          className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-bold transition-all cursor-pointer min-h-[32px] shrink-0 ${
-                            showFilterDropdown
-                              ? "bg-white border-white text-black font-black"
-                              : "bg-[#0d0d11] border-neutral-800 text-slate-400 hover:text-white hover:border-neutral-600 hover:bg-neutral-900"
-                          }`}
-                          title="筛选要显示的特定 K 线价格形态"
-                        >
-                          <SlidersHorizontal className="w-3.5 h-3.5" />
-                          <span className="hidden xs:inline">筛选</span>
-                        </button>
-
-                        {showFilterDropdown && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-40" 
-                              onClick={() => setShowFilterDropdown(false)}
-                            />
-                            <div className="absolute right-0 mt-1 rounded-md bg-[#0d0d11] border border-neutral-700 p-1.5 shadow-2xl z-50 animate-fade-in w-48 sm:w-56 max-h-[300px] overflow-y-auto">
-                              <div className="px-2 py-1 text-[9px] font-mono text-slate-500 uppercase tracking-wider border-b border-neutral-800 mb-1 text-left">
-                                选择形态 (多选)
-                              </div>
-                              {PATTERN_CATEGORIES.map(cat => {
-                                const isSelected = cat.val === "ALL" 
-                                  ? patternFilters.includes("ALL")
-                                  : patternFilters.includes(cat.val);
-                                const count = getCategoryCount(cat.val);
-                                return (
-                                  <button
-                                    key={cat.val}
-                                    onClick={() => handleTogglePatternFilter(cat.val)}
-                                    className={`w-full text-left px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-between min-h-[28px] ${
-                                      isSelected
-                                        ? "bg-white text-black font-black"
-                                        : "text-slate-400 hover:bg-neutral-900 hover:text-white"
-                                    }`}
-                                  >
-                                    <span>{cat.label} ({count})</span>
-                                    {isSelected && <Check className="w-3 h-3 text-black" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                    </div>
-                  </div>
 
                   {/* Main Price Action SVG Chart */}
                   <PriceActionChart
@@ -546,13 +361,25 @@ export default function App() {
                     selectedPattern={selectedPattern}
                     onSelectPattern={handleSelectPattern}
                     showPatterns={showPatterns}
+                    setShowPatterns={setShowPatterns}
                     showZones={showZones}
+                    setShowZones={setShowZones}
                     showTrends={showTrends}
+                    setShowTrends={setShowTrends}
                     showVolume={showVolume}
+                    setShowVolume={setShowVolume}
                     focusIndex={focusIndex}
                     onCandleClick={handleCandleClick}
                     timeframe={timeframe}
+                    setTimeframe={(tf) => {
+                      setTimeframe(tf);
+                      setDrilldownDay(null);
+                    }}
                     isChineseStyle={isChineseStyle}
+                    setIsChineseStyle={setIsChineseStyle}
+                    patternFilters={patternFilters}
+                    onTogglePatternFilter={handleTogglePatternFilter}
+                    getCategoryCount={getCategoryCount}
                   />
 
                   {/* Calculate active focus pattern */}
@@ -588,30 +415,58 @@ export default function App() {
                       }
                     })();
 
+                    const isBullish = activeFocus.type.includes("BULLISH") || 
+                                      activeFocus.type.includes("BOTTOM") || 
+                                      activeFocus.type === "MORNING_STAR" ||
+                                      activeFocus.type.includes("ASCENDING");
+
+                    const isBearish = activeFocus.type.includes("BEARISH") || 
+                                      activeFocus.type.includes("TOP") || 
+                                      activeFocus.type === "EVENING_STAR" ||
+                                      activeFocus.type === "HEAD_AND_SHOULDERS" ||
+                                      activeFocus.type.includes("DESCENDING");
+
+                    const upColor = isChineseStyle ? "#ff3b30" : "#00c805";
+                    const downColor = isChineseStyle ? "#00c805" : "#ff3b30";
+                    const upColorBg = isChineseStyle ? "rgba(255, 59, 48, 0.1)" : "rgba(0, 200, 5, 0.1)";
+                    const downColorBg = isChineseStyle ? "rgba(0, 200, 5, 0.1)" : "rgba(255, 59, 48, 0.1)";
+                    const upColorBorder = isChineseStyle ? "rgba(255, 59, 48, 0.2)" : "rgba(0, 200, 5, 0.2)";
+                    const downColorBorder = isChineseStyle ? "rgba(0, 200, 5, 0.2)" : "rgba(255, 59, 48, 0.2)";
+
+                    const activeColor = isBullish ? upColor : isBearish ? downColor : "#6366f1";
+                    const activeColorBg = isBullish ? upColorBg : isBearish ? downColorBg : "rgba(99, 102, 241, 0.1)";
+                    const activeColorBorder = isBullish ? upColorBorder : isBearish ? downColorBorder : "rgba(99, 102, 241, 0.2)";
+
                     return (
                       <>
                         <div className="mt-3">
                           <button
                             onClick={() => setShowDiagnosticModal(true)}
-                            className="w-full flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 bg-neutral-950 hover:bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl cursor-pointer transition-all animate-fade-in group text-left gap-2 shadow-lg"
+                            className="w-full flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 bg-[#0b0c10] hover:bg-[#12131a] border border-neutral-800 hover:border-neutral-700 rounded-lg cursor-pointer transition-all duration-200 animate-fade-in group text-left shadow-md gap-3"
+                            style={{
+                              borderLeft: `3px solid ${activeColor}`
+                            }}
                           >
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                              <span className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-300">
-                                <span className="flex h-2 w-2 rounded-full bg-[#00c805] animate-pulse" />
-                                形态识别: <span className="text-white font-black">{displayLabel}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3.5">
+                              {/* Pattern Title with Dot Indicator */}
+                              <span className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white font-sans">
+                                <span className="flex h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: activeColor }} />
+                                形态识别: {displayLabel}
                               </span>
-                              <span className="text-neutral-800 hidden sm:inline">|</span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                置信度: <span className="text-yellow-500 font-bold">{Math.round(activeFocus.confidence * 100)}%</span>
-                              </span>
-                              <span className="text-neutral-800 hidden sm:inline">|</span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                参考价: <span className="text-white font-bold">${activeFocus.price}</span>
-                              </span>
+                              
+                              <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                                <span>置信度: <span className="text-amber-500 font-bold">{Math.round(activeFocus.confidence * 100)}%</span></span>
+                                <span className="text-neutral-800">|</span>
+                                <span>参考价: <span className="text-slate-200 font-bold">${activeFocus.price}</span></span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1 text-[11px] text-indigo-400 group-hover:text-indigo-300 transition-colors font-mono font-bold">
+
+                            <div 
+                              className="flex items-center gap-0.5 text-[11px] font-bold font-sans shrink-0 transition-colors"
+                              style={{ color: activeColor }}
+                            >
                               <span>查看形态详解</span>
-                              <ChevronRight className="w-3.5 h-3.5" />
+                              <ChevronRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
                             </div>
                           </button>
                         </div>
@@ -764,34 +619,34 @@ export default function App() {
       </footer>
 
       {/* Mobile Bottom Navigation */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-[#07070a]/95 backdrop-blur-xl border-t border-neutral-900 z-50 px-8 pb-safe">
-        <div className="flex items-center justify-around h-14">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-[#07070a]/95 backdrop-blur-xl border-t border-neutral-900 z-50 px-6 pb-safe">
+        <div className="flex items-center justify-around h-11 sm:h-14">
           <button
             onClick={() => {
               setActiveTab("challenge");
               setSelectedPattern(null);
               setFocusIndex(null);
             }}
-            className={`flex flex-col items-center justify-center gap-1.5 py-1 px-4 transition-all duration-200 cursor-pointer ${
+            className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 py-1 px-3 transition-all duration-200 cursor-pointer ${
               activeTab === "challenge"
                 ? "text-white font-bold"
                 : "text-neutral-500 hover:text-neutral-300"
             }`}
           >
-            <GraduationCap className={`w-4.5 h-4.5 transition-transform duration-200 ${activeTab === "challenge" ? "text-white scale-110" : "text-neutral-500"}`} />
-            <span className="text-[10px] tracking-widest font-medium">实战</span>
+            <GraduationCap className={`w-4 h-4 transition-transform duration-200 ${activeTab === "challenge" ? "text-white scale-110" : "text-neutral-500"}`} />
+            <span className="text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest font-medium">实战</span>
           </button>
 
           <button
             onClick={() => setActiveTab("review")}
-            className={`flex flex-col items-center justify-center gap-1.5 py-1 px-4 transition-all duration-200 cursor-pointer ${
+            className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1.5 py-1 px-3 transition-all duration-200 cursor-pointer ${
               activeTab === "review"
                 ? "text-white font-bold"
                 : "text-neutral-500 hover:text-neutral-300"
             }`}
           >
-            <BarChart3 className={`w-4 h-4 transition-transform duration-200 ${activeTab === "review" ? "text-white scale-110" : "text-neutral-500"}`} />
-            <span className="text-[10px] tracking-widest font-medium">学习</span>
+            <BarChart3 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 ${activeTab === "review" ? "text-white scale-110" : "text-neutral-500"}`} />
+            <span className="text-[9px] sm:text-[10px] tracking-wider sm:tracking-widest font-medium">学习</span>
           </button>
         </div>
       </div>

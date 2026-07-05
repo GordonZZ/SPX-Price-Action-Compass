@@ -12,7 +12,7 @@ import { Candle } from "./src/types.ts";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const DATA_DIR = path.join(process.cwd(), "data");
 
 const TIMEFRAMES = ["1m", "5m", "15m", "4h", "1d"] as const;

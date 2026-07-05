@@ -1,6 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Candle, DetectedPattern, SupportResistanceZone, MarketTrend } from "../types.js";
-import { Layers, Eye, EyeOff, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { Layers, Eye, EyeOff, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, Clock, ChevronDown, Check, Grid, Triangle, ArrowUpDown, BarChart3, SlidersHorizontal } from "lucide-react";
+
+const PATTERN_CATEGORIES = [
+  { val: "ALL", label: "全部形态" },
+  { val: "NONE", label: "无 (不显示形态)" },
+  { val: "PIN_BAR", label: "针形 K线 (Pin Bar)" },
+  { val: "ENGULFING", label: "吞没 K线 (Engulfing)" },
+  { val: "STAR", label: "星体反转 (Star)" },
+  { val: "DOJI", label: "十字星 (Doji)" },
+  { val: "DOUBLE", label: "双顶双底 (Double)" },
+  { val: "HEAD_SHOULDERS", label: "头肩结构 (H&S)" },
+  { val: "TRIANGLE", label: "收敛整理 (Triangle)" },
+];
 
 const getPatternLabel = (type: string, name: string): string => {
   switch (type) {
@@ -33,14 +45,25 @@ interface PriceActionChartProps {
   selectedPattern: DetectedPattern | null;
   onSelectPattern: (pattern: DetectedPattern | null) => void;
   showPatterns: boolean;
+  setShowPatterns?: (show: boolean) => void;
   showZones: boolean;
+  setShowZones?: (show: boolean) => void;
   showTrends: boolean;
+  setShowTrends?: (show: boolean) => void;
   showVolume: boolean;
+  setShowVolume?: (show: boolean) => void;
   // Controls for interactive zoom/scroll from parent if needed
   focusIndex?: number | null;
   onCandleClick?: (candle: Candle) => void;
-  timeframe?: string;
+  timeframe?: "1m" | "5m" | "15m" | "4h" | "1d";
+  setTimeframe?: (tf: "1m" | "5m" | "15m" | "4h" | "1d") => void;
   isChineseStyle?: boolean;
+  setIsChineseStyle?: (isChinese: boolean) => void;
+  // Pattern filter values and actions
+  patternFilters?: string[];
+  onTogglePatternFilter?: (val: string) => void;
+  getCategoryCount?: (val: string) => number;
+  isChallengeMode?: boolean;
 }
 
 export default function PriceActionChart({
@@ -50,15 +73,120 @@ export default function PriceActionChart({
   trend,
   selectedPattern,
   onSelectPattern,
-  showPatterns,
-  showZones,
-  showTrends,
-  showVolume,
+  showPatterns: propShowPatterns,
+  setShowPatterns: propSetShowPatterns,
+  showZones: propShowZones,
+  setShowZones: propSetShowZones,
+  showTrends: propShowTrends,
+  setShowTrends: propSetShowTrends,
+  showVolume: propShowVolume,
+  setShowVolume: propSetShowVolume,
   focusIndex = null,
   onCandleClick,
-  timeframe,
-  isChineseStyle = false,
+  timeframe: propTimeframe = "5m",
+  setTimeframe: propSetTimeframe,
+  isChineseStyle: propIsChineseStyle = false,
+  setIsChineseStyle: propSetIsChineseStyle,
+  patternFilters: propPatternFilters,
+  onTogglePatternFilter: propOnTogglePatternFilter,
+  getCategoryCount: propGetCategoryCount,
+  isChallengeMode = false,
 }: PriceActionChartProps) {
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showTimeframeDropdown, setShowTimeframeDropdown] = useState<boolean>(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState<boolean>(false);
+
+  // Fallback states if parent doesn't provide them
+  const [localShowPatterns, setLocalShowPatterns] = useState<boolean>(true);
+  const showPatterns = propSetShowPatterns ? propShowPatterns : localShowPatterns;
+  const setShowPatterns = propSetShowPatterns || setLocalShowPatterns;
+
+  const [localShowZones, setLocalShowZones] = useState<boolean>(true);
+  const showZones = propSetShowZones ? propShowZones : localShowZones;
+  const setShowZones = propSetShowZones || setLocalShowZones;
+
+  const [localShowTrends, setLocalShowTrends] = useState<boolean>(true);
+  const showTrends = propSetShowTrends ? propShowTrends : localShowTrends;
+  const setShowTrends = propSetShowTrends || setLocalShowTrends;
+
+  const [localShowVolume, setLocalShowVolume] = useState<boolean>(true);
+  const showVolume = propSetShowVolume ? propShowVolume : localShowVolume;
+  const setShowVolume = propSetShowVolume || setLocalShowVolume;
+
+  const [localTimeframe, setLocalTimeframe] = useState<"1m" | "5m" | "15m" | "4h" | "1d">("5m");
+  const timeframe = propSetTimeframe ? propTimeframe : localTimeframe;
+  const setTimeframe = propSetTimeframe || setLocalTimeframe;
+
+  const [localIsChineseStyle, setLocalIsChineseStyle] = useState<boolean>(false);
+  const isChineseStyle = propSetIsChineseStyle ? propIsChineseStyle : localIsChineseStyle;
+  const setIsChineseStyle = propSetIsChineseStyle || setLocalIsChineseStyle;
+
+  const [localPatternFilters, setLocalPatternFilters] = useState<string[]>(["ALL"]);
+  const patternFilters = propPatternFilters !== undefined ? propPatternFilters : localPatternFilters;
+
+  const onTogglePatternFilter = propOnTogglePatternFilter || ((val: string) => {
+    if (val === "ALL") {
+      setLocalPatternFilters(["ALL"]);
+    } else if (val === "NONE") {
+      setLocalPatternFilters(["NONE"]);
+    } else {
+      setLocalPatternFilters(prev => {
+        const withoutAllOrNone = prev.filter(x => x !== "ALL" && x !== "NONE");
+        if (withoutAllOrNone.includes(val)) {
+          const updated = withoutAllOrNone.filter(x => x !== val);
+          return updated.length === 0 ? ["ALL"] : updated;
+        } else {
+          return [...withoutAllOrNone, val];
+        }
+      });
+    }
+  });
+
+  const getCategoryCount = propGetCategoryCount || ((val: string) => {
+    if (val === "ALL") return patterns.length;
+    if (val === "NONE") return 0;
+    return patterns.filter(p => {
+      if (val === "PIN_BAR") return p.type.includes("PIN_BAR");
+      if (val === "ENGULFING") return p.type.includes("ENGULFING");
+      if (val === "STAR") return p.type.includes("STAR");
+      if (val === "DOJI") return p.type === "DOJI";
+      if (val === "DOUBLE") return p.type.includes("DOUBLE");
+      if (val === "HEAD_SHOULDERS") return p.type.includes("HEAD_AND_SHOULDERS") || p.type.includes("INVERSE_HEAD_AND_SHOULDERS");
+      if (val === "TRIANGLE") return p.type.includes("TRIANGLE");
+      return false;
+    }).length;
+  });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
+
+  const [containerWidth, setContainerWidth] = useState<number>(720);
+  const [containerHeight, setContainerHeight] = useState<number>(480);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const container = containerRef.current;
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const rect = entries[0].contentRect;
+      setContainerWidth(rect.width || 720);
+      setContainerHeight(rect.height || 480);
+    });
+    resizeObserver.observe(container);
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   // Chart view state: indices of visible candles
   const totalCandles = candles.length;
   const [zoomLevel, setZoomLevel] = useState<number>(100);
@@ -68,8 +196,6 @@ export default function PriceActionChart({
 
   const [hoveredCandle, setHoveredCandle] = useState<{ candle: Candle; index: number } | null>(null);
   const [crosshairPos, setCrosshairPos] = useState<{ x: number; y: number; price: number; dateStr: string } | null>(null);
-
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const [showMobileTip, setShowMobileTip] = useState(true);
 
@@ -158,10 +284,13 @@ export default function PriceActionChart({
   const priceRange = Math.max(0.01, maxPrice - minPrice);
 
   // Chart dimensions
-  const chartHeight = 310;
-  const volumeHeight = 50;
+  const xAxisHeight = 20;
+  const volumeHeight = isFullscreen ? 80 : 50;
+  const chartHeight = isFullscreen 
+    ? Math.max(180, containerHeight - xAxisHeight - (showVolume ? volumeHeight : 0)) 
+    : 310;
   const totalChartHeight = chartHeight + (showVolume ? volumeHeight : 0);
-  const chartWidth = 720; // Will scale responsively inside parent SVG viewBox
+  const chartWidth = isFullscreen ? containerWidth : 720;
   const candleAreaWidth = chartWidth - 60; // 60px reserved for the left-side Y-axis column
 
   // Coordinate projection helper
@@ -991,41 +1120,256 @@ export default function PriceActionChart({
   }
 
   return (
-    <div className="flex flex-col bg-[#0c0d10] border border-[#1e222d] rounded-2xl overflow-hidden shadow-2xl">
+    <div className={`flex flex-col bg-[#0c0d10] overflow-hidden shadow-2xl ${
+      isFullscreen 
+        ? "fixed inset-0 z-[9999] w-screen h-screen rounded-none p-0 border-none" 
+        : "relative border border-[#1e222d] rounded-2xl"
+    }`}>
       {/* Chart Control Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 border-b border-[#1e222d] bg-[#000000] gap-2">
-        <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-3">
-          {/* S&P 500 Index Title / SPX 5m */}
-          <div className="flex items-center gap-2">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-[#00c805] animate-pulse"></span>
-            <h3 className="text-xs font-semibold text-slate-100 font-mono">
-              {/* Desktop version */}
-              <span className="hidden sm:inline">
-                S&P 500 Index (SPX) <span className="text-[9px] bg-neutral-900 px-1.5 py-0.5 rounded text-slate-400 font-mono ml-1">{getDisplayTimeframe()}</span>
-              </span>
-              {/* Mobile version - centered or simple */}
-              <span className="inline sm:hidden text-xs font-black tracking-widest text-white uppercase">
-                SPX {timeframe ? timeframe.toLowerCase() : '5m'}
-              </span>
-            </h3>
+      <div className="flex items-center justify-between px-1.5 xs:px-2.5 sm:px-4 py-1 border-b border-[#1e222d] bg-[#000000] select-none min-h-10 sm:min-h-12 shrink-0 gap-1.5 sm:gap-3 w-full relative z-30">
+        {/* Left Side: Symbol, Timeframe, Divider, Hovered details */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Symbol */}
+          <div className="flex items-center gap-1">
+            <span className="flex h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-[#00c805] animate-pulse"></span>
+            <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-100 font-mono">SPX</span>
           </div>
 
+          {/* Timeframe Selector */}
+          <div className="relative shrink-0">
+            {isChallengeMode ? (
+              <div className="relative group shrink-0">
+                <div className="flex items-center justify-center gap-1 h-6 sm:h-7 px-1.5 sm:px-2 bg-[#1e222d]/25 border border-[#1e222d]/40 rounded text-[9px] sm:text-[10px] font-bold font-mono text-slate-400 cursor-help select-none">
+                  <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-500" />
+                  <span>5M</span>
+                </div>
+                <div className="absolute left-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+                  仅针对 5M 图进行价格行为训练
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => setShowTimeframeDropdown(!showTimeframeDropdown)}
+                  className="flex items-center justify-center gap-1 h-6 sm:h-7 px-1.5 sm:px-2 bg-[#1e222d]/40 hover:bg-[#1e222d] text-slate-200 border border-[#1e222d]/60 hover:border-slate-500 rounded text-[9px] sm:text-[10px] font-bold tracking-wide transition-all cursor-pointer min-h-[20px] sm:min-h-[24px] font-mono"
+                >
+                  <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
+                  <span>{timeframe ? timeframe.toUpperCase() : "5M"}</span>
+                  <ChevronDown className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-slate-400" />
+                </button>
+                
+                {showTimeframeDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowTimeframeDropdown(false)} />
+                    <div className="absolute left-0 mt-1 rounded bg-[#0d0d11] border border-[#1e222d] p-1 shadow-2xl z-50 animate-fade-in w-36">
+                      {[
+                        { label: "1 min K (1m)", val: "1m" },
+                        { label: "5 min K (5m)", val: "5m" },
+                        { label: "15 min K (15m)", val: "15m" },
+                        { label: "4h K (4h)", val: "4h" },
+                        { label: "日 K (1d)", val: "1d" },
+                      ].map(t => (
+                        <button
+                          key={t.val}
+                          onClick={() => {
+                            setTimeframe(t.val as any);
+                            setShowTimeframeDropdown(false);
+                          }}
+                          className={`w-full text-left px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-between min-h-[26px] ${
+                            timeframe === t.val
+                              ? "bg-white text-black font-black"
+                              : "text-slate-400 hover:bg-neutral-950 hover:text-white"
+                          }`}
+                        >
+                          <span>{t.label}</span>
+                          {timeframe === t.val && <Check className="w-3 h-3 text-black" />}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
 
+          <div className="hidden md:block w-[1px] h-3.5 bg-[#1e222d]/80" />
+
+          {/* Inline OHLC Details */}
+          <div className="hidden md:flex items-center text-[10px] font-mono text-slate-400 gap-2">
+            {hoveredCandle && (
+              <>
+                <span className="text-slate-500">O</span> <span className="text-slate-200 font-bold">{hoveredCandle.candle.open}</span>
+                <span className="text-slate-500">H</span> <span className="text-slate-200 font-bold">{hoveredCandle.candle.high}</span>
+                <span className="text-slate-500">L</span> <span className="text-slate-200 font-bold">{hoveredCandle.candle.low}</span>
+                <span className="text-slate-500">C</span> <span className={`font-bold ${hoveredCandle.candle.close >= hoveredCandle.candle.open 
+                  ? (isChineseStyle ? "text-[#ff3b30]" : "text-[#00c805]") 
+                  : (isChineseStyle ? "text-[#00c805]" : "text-[#ff3b30]")}`}>{hoveredCandle.candle.close}</span>
+                <span className="text-slate-500 ml-1">V</span> <span className="text-slate-400">{hoveredCandle.candle.volume?.toLocaleString() || "0"}</span>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Price Action Details - clean and responsive */}
-        <div className="min-h-[16px] flex items-center justify-start sm:justify-end">
-          {hoveredCandle && (
-            <p className="text-[9px] sm:text-[10px] font-mono text-slate-400 flex flex-wrap gap-x-2 gap-y-0.5">
-              <span>时间: <b className="text-slate-200">{new Date(hoveredCandle.candle.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b></span>
-              <span>开: <b className="text-slate-200">{hoveredCandle.candle.open}</b></span>
-              <span>高: <b className="text-slate-200">{hoveredCandle.candle.high}</b></span>
-              <span>低: <b className="text-slate-200">{hoveredCandle.candle.low}</b></span>
-              <span>收: <b className={hoveredCandle.candle.close >= hoveredCandle.candle.open 
-                ? (isChineseStyle ? "text-[#ff3b30]" : "text-[#00c805]") 
-                : (isChineseStyle ? "text-[#00c805]" : "text-[#ff3b30]")}>{hoveredCandle.candle.close}</b></span>
-            </p>
+        {/* Right Side: Clean Icon Toggles with absolute hover tooltips */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Support/Resistance Zone Toggle */}
+          <div className="relative group">
+            <button
+              onClick={() => setShowZones(!showZones)}
+              className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded transition-all cursor-pointer ${
+                showZones
+                  ? "bg-white text-black"
+                  : "text-slate-400 hover:text-white hover:bg-[#1e222d]"
+              }`}
+            >
+              <Grid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+            <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+              支撑/阻力水位
+            </div>
+          </div>
+
+          {/* Show Patterns Toggle */}
+          <div className="relative group">
+            <button
+              onClick={() => setShowPatterns(!showPatterns)}
+              className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded transition-all cursor-pointer ${
+                showPatterns
+                  ? "bg-white text-black"
+                  : "text-slate-400 hover:text-white hover:bg-[#1e222d]"
+              }`}
+            >
+              <Triangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+            <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+              图表形态标记
+            </div>
+          </div>
+
+          {/* Show Trends (HH/LL) Toggle */}
+          {!isChallengeMode && (
+            <div className="relative group">
+              <button
+                onClick={() => setShowTrends(!showTrends)}
+                className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded transition-all cursor-pointer ${
+                  showTrends
+                    ? "bg-white text-black"
+                    : "text-slate-400 hover:text-white hover:bg-[#1e222d]"
+                }`}
+              >
+                <ArrowUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+                HH/LL 趋势标记
+              </div>
+            </div>
           )}
+
+          {/* Volume Histogram Toggle */}
+          {!isChallengeMode && (
+            <div className="relative group">
+              <button
+                onClick={() => setShowVolume(!showVolume)}
+                className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded transition-all cursor-pointer ${
+                  showVolume
+                    ? "bg-white text-black"
+                    : "text-slate-400 hover:text-white hover:bg-[#1e222d]"
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+                成交量柱状图
+              </div>
+            </div>
+          )}
+
+          {/* Pattern Filtering Dropdown */}
+          {!isChallengeMode && (
+            <div className="relative group">
+              <button
+                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded transition-all cursor-pointer ${
+                  showFilterDropdown
+                    ? "bg-white text-black"
+                    : "text-slate-400 hover:text-white hover:bg-[#1e222d]"
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </button>
+              <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+                筛选特定形态
+              </div>
+
+              {showFilterDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowFilterDropdown(false)} />
+                  <div className="absolute right-0 mt-2 rounded-lg bg-[#0d0d11] border border-neutral-700 p-1.5 shadow-2xl z-50 animate-fade-in w-48 sm:w-56 max-h-[300px] overflow-y-auto">
+                    <div className="px-2 py-1 text-[9px] font-mono text-slate-500 uppercase tracking-wider border-b border-neutral-800 mb-1 text-left">
+                      选择形态 (多选)
+                    </div>
+                    {PATTERN_CATEGORIES.map(cat => {
+                      const isSelected = cat.val === "ALL" 
+                        ? patternFilters.includes("ALL")
+                        : patternFilters.includes(cat.val);
+                      const count = getCategoryCount ? getCategoryCount(cat.val) : 0;
+                      return (
+                        <button
+                          key={cat.val}
+                          onClick={() => {
+                            if (onTogglePatternFilter) onTogglePatternFilter(cat.val);
+                          }}
+                          className={`w-full text-left px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-between min-h-[26px] ${
+                            isSelected
+                              ? "bg-white text-black font-black"
+                              : "text-slate-400 hover:bg-neutral-950 hover:text-white"
+                          }`}
+                        >
+                          <span>{cat.label} ({count})</span>
+                          {isSelected && <Check className="w-3 h-3 text-black" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="w-[1px] h-3.5 bg-[#1e222d] mx-0.5 sm:mx-1" />
+
+          {/* Red/Green Color Switcher */}
+          <div className="relative group">
+            <button
+              onClick={() => setIsChineseStyle(!isChineseStyle)}
+              className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded hover:bg-[#1e222d] transition-all cursor-pointer select-none"
+            >
+              <span className="flex items-center gap-0.5">
+                <span className={`w-0.5 h-2.5 sm:w-1 sm:h-3 rounded-full transition-all duration-300 ${isChineseStyle ? "bg-[#ff3b30]" : "bg-[#00c805]"}`} />
+                <span className={`w-0.5 h-2.5 sm:w-1 sm:h-3 rounded-full transition-all duration-300 ${isChineseStyle ? "bg-[#00c805]" : "bg-[#ff3b30]"}`} />
+              </span>
+            </button>
+            <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+              {isChineseStyle ? "习惯：红涨绿跌" : "习惯：绿涨红跌"}
+            </div>
+          </div>
+
+          {/* Fullscreen Button */}
+          <div className="relative group">
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 hover:bg-[#1e222d] text-slate-400 hover:text-white rounded transition-all cursor-pointer select-none"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              )}
+            </button>
+            <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block bg-[#16171d] border border-[#2d313f] text-slate-200 text-[10px] px-2 py-1 rounded shadow-2xl whitespace-nowrap z-50 pointer-events-none font-bold">
+              {isFullscreen ? "退出全屏 (Esc)" : "全屏模式"}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1039,7 +1383,9 @@ export default function PriceActionChart({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`relative w-full select-none ${isDragging ? "cursor-grabbing" : "cursor-crosshair"}`}
+        className={`relative w-full select-none ${isDragging ? "cursor-grabbing" : "cursor-crosshair"} ${
+          isFullscreen ? "flex-1 h-0 min-h-[300px]" : ""
+        }`}
       >
         {/* Floating Zoom Slider in the bottom-right corner of the chart */}
         <div className="absolute bottom-6 right-3 sm:right-5 flex items-center gap-1.5 bg-black/85 backdrop-blur-md px-2 py-1 rounded-full border border-neutral-800 shadow-2xl z-20 hover:border-neutral-700 transition-all">

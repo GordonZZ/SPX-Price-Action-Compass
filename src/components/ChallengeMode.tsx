@@ -336,19 +336,6 @@ export default function ChallengeMode({ candles, patterns, zones, trend, isChine
             </div>
 
             <div className="flex items-center gap-3 shrink-0 ml-auto">
-              <button
-                onClick={() => setShowZones(prev => !prev)}
-                className={`px-2 py-1 text-[10px] font-bold rounded-md border transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
-                  showZones
-                    ? "bg-[#00c805]/15 border-[#00c805]/40 text-[#00c805]"
-                    : "bg-[#0d0d11] border-neutral-800 hover:border-slate-600 text-slate-500 hover:text-slate-300"
-                }`}
-                title="开启/关闭 支撑阻力参考线"
-              >
-                <Layers className="w-3 h-3" />
-                <span>S/R 支撑阻力</span>
-              </button>
-
               <span className="text-[10px] text-slate-500 font-mono shrink-0">
                 总形态: <span className="text-slate-300 font-bold">{challengePatterns.length}</span>
               </span>
@@ -476,13 +463,14 @@ export default function ChallengeMode({ candles, patterns, zones, trend, isChine
           showVolume={true}
           focusIndex={visibleChallengeCandles.length - 1} // Center on cutoff bar
           isChineseStyle={isChineseStyle}
+          isChallengeMode={true}
         />
         
         {/* Clean borderless guide text block */}
         <div className="px-1 text-left text-[11px] text-slate-500 leading-relaxed flex gap-2 font-mono">
           <Sparkles className="w-4 h-4 text-white shrink-0 mt-0.5" />
           <p>
-            <b>提示:</b> 图表最右侧最后一根 K 线即为<b>形态信号K线 (Signal Bar)</b>。由于未来数据被遮蔽，你需要观察前面的蜡烛图振幅、是否发生关键支撑阻力位的假突破，从而研判下一步发力方向。
+            <b>提示:</b> 最右侧 K 线为<b>信号 K 线</b>。请结合左侧历史 K 线及关键水位，研判未来的发力方向。
           </p>
         </div>
       </div>
@@ -516,7 +504,7 @@ export default function ChallengeMode({ candles, patterns, zones, trend, isChine
                   <p className="text-xs text-slate-400 mt-2.5 leading-relaxed font-sans">
                     {isAnswered 
                       ? activePattern.description 
-                      : "请研判左侧信号 K 线 (Signal Bar) 附近的价格行为。结合上方支撑阻力以及量价表现，在下方给出你的多空挂单突破决策。答题后将实时复盘并揭晓裸K形态和机构订单流逻辑。"}
+                      : "请研判信号 K 线 (Signal Bar) 附近的价格行为与关键支撑阻力，并在下方给出你的多空挂单决策。"}
                   </p>
                 </div>
 
