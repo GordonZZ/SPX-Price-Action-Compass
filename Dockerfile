@@ -28,9 +28,11 @@ ENV PORT=3000
 COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
-# Copy compiled dist files and data directory from the builder stage
+# Copy compiled dist files from the builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/data ./data
+
+# Create empty data directory (server.ts will populate it dynamically on startup)
+RUN mkdir -p data
 
 # Expose port 3000
 EXPOSE 3000
