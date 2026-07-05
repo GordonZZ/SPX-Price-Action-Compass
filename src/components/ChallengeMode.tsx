@@ -230,10 +230,10 @@ export default function ChallengeMode({ candles, patterns, zones, trend, isChine
   const strokeDashoffset = circumference - (winPercent / 100) * circumference;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start select-none">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch select-none flex-1">
       
       {/* Column 1: Chart Canvas Area & Practice Selector (Left side) */}
-      <div className="lg:col-span-2 flex flex-col gap-4">
+      <div className="lg:col-span-2 flex flex-col gap-4 h-full">
         
         {/* Score & Header info - Sleek, flat, borderless inline layout with premium circular stat */}
         <div className="flex flex-row items-center justify-between gap-3 px-1 py-1">

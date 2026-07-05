@@ -286,11 +286,9 @@ export default function PriceActionChart({
   // Chart dimensions
   const xAxisHeight = 20;
   const volumeHeight = isFullscreen ? 80 : 50;
-  const chartHeight = isFullscreen 
-    ? Math.max(180, containerHeight - xAxisHeight - (showVolume ? volumeHeight : 0)) 
-    : 310;
+  const chartHeight = Math.max(180, containerHeight - xAxisHeight - (showVolume ? volumeHeight : 0));
   const totalChartHeight = chartHeight + (showVolume ? volumeHeight : 0);
-  const chartWidth = isFullscreen ? containerWidth : 720;
+  const chartWidth = containerWidth;
   const candleAreaWidth = chartWidth - 60; // 60px reserved for the left-side Y-axis column
 
   // Coordinate projection helper
@@ -1384,7 +1382,7 @@ export default function PriceActionChart({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={`relative w-full select-none ${isDragging ? "cursor-grabbing" : "cursor-crosshair"} ${
-          isFullscreen ? "flex-1 h-0 min-h-[300px]" : ""
+          isFullscreen ? "flex-1 h-0 min-h-[300px]" : "h-[320px] sm:h-[450px] lg:h-[calc(100vh-250px)] lg:min-h-[520px] xl:h-[calc(100vh-230px)] xl:min-h-[620px]"
         }`}
       >
         {/* Floating Zoom Slider in the bottom-right corner of the chart */}

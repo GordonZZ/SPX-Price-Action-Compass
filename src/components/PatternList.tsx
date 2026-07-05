@@ -178,7 +178,7 @@ export default function PatternList({
 
 
       {/* 3. Detected Pattern Waves */}
-      <div className="bg-black border border-neutral-800 rounded-none p-3 sm:p-5 shadow-2xl flex flex-col gap-3 sm:gap-4 text-left transition-all">
+      <div className="bg-black border border-neutral-800 rounded-none p-3 sm:p-5 shadow-2xl flex-1 flex flex-col gap-3 sm:gap-4 text-left transition-all">
         
         <div className="flex items-center justify-between border-b border-neutral-800 pb-2 sm:pb-3">
           <h4 className="text-[10px] sm:text-xs font-bold text-slate-100 flex items-center gap-1 sm:gap-1.5 text-white tracking-widest uppercase font-mono">
@@ -204,10 +204,10 @@ export default function PatternList({
             <p className="text-[9px] text-slate-600 mt-1">请尝试平移或缩放图表，或切换到“日K”载入大周期结构</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1 flex flex-col min-h-0">
             
             {/* Scrollable Container with restricted height to match layout seamlessly without empty spaces */}
-            <div className="max-h-[220px] overflow-y-auto pr-1 space-y-2 font-mono">
+            <div className="flex-1 min-h-[150px] lg:max-h-[calc(100vh-420px)] overflow-y-auto pr-1 space-y-2 font-mono">
               {/* Show Top Signals */}
               {(showAllBehaviors ? patterns : topObservations).map(p => {
                 const isSel = activeFocus?.id === p.id;

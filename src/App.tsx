@@ -5,7 +5,7 @@ import PatternList from "./components/PatternList.tsx";
 import PriceActionChart from "./components/PriceActionChart.tsx";
 import ChallengeMode from "./components/ChallengeMode.tsx";
 import { Candle, DetectedPattern, SupportResistanceZone, MarketTrend, SPXDataResponse } from "./types.js";
-import { SlidersHorizontal, BookOpen, GraduationCap, Flame, RefreshCw, BarChart3, HelpCircle, Layers, Eye, EyeOff, ChevronDown, Check, Filter, Sparkles, TrendingUp, ChevronRight, Clock, Grid, Triangle, ArrowUpDown } from "lucide-react";
+import { SlidersHorizontal, BookOpen, GraduationCap, Flame, RefreshCw, BarChart3, HelpCircle, Layers, Eye, EyeOff, ChevronDown, Check, Filter, Sparkles, TrendingUp, ChevronRight, Clock, Grid, Triangle, ArrowUpDown, Github } from "lucide-react";
 import DiagnosticModal from "./components/DiagnosticModal.tsx";
 
 const PATTERN_CATEGORIES = [
@@ -258,7 +258,7 @@ export default function App() {
       
       {/* 1. Global Navigation Header */}
       <header className="bg-black/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-50 px-3 py-2 sm:px-6 sm:py-3">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-[1800px] mx-auto w-full flex flex-col md:flex-row items-center justify-between gap-4">
           
           {/* App Branding */}
           <div className="flex flex-wrap items-center gap-4">
@@ -336,7 +336,7 @@ export default function App() {
       </header>
 
       {/* 2. Main Content Dashboard Stage */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-2 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-6 flex flex-col gap-6">
+      <main className="flex-1 w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 sm:pb-6 flex flex-col gap-5">
         
         {loading && candles.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center py-20">
@@ -347,10 +347,10 @@ export default function App() {
           <>
             {activeTab === "review" ? (
               /* TAB 1: INTERACTIVE PRICE ACTION REVIEW */
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-stretch flex-1">
                 
                 {/* Column 1: Interactive SVG Candlestick Chart Stage */}
-                <div className="lg:col-span-3 flex flex-col gap-4">
+                <div className="lg:col-span-3 flex flex-col gap-4 h-full">
 
                   {/* Main Price Action SVG Chart */}
                   <PriceActionChart
@@ -576,7 +576,7 @@ export default function App() {
                 </div>
 
                 {/* Column 2: Patterns Sidebar & Trend Diagnostics (Right Sidebar matching trading conventions) */}
-                <div className="lg:col-span-1 h-full">
+                <div className="lg:col-span-1 flex flex-col h-full">
                   <PatternList
                     patterns={filteredPatterns}
                     allPatterns={patterns}
@@ -614,8 +614,20 @@ export default function App() {
       </main>
 
       {/* 3. Global Sleek Status Bar Footer */}
-      <footer className="hidden sm:block py-3 bg-black border-t border-neutral-950 text-center text-[9px] text-slate-600 mt-auto font-mono px-4 select-none">
-        <div>© 2026 SPX Price Action Compass · 数据延迟 (t-1) · 非投资建议 学习用途</div>
+      <footer className="py-4 bg-black border-t border-neutral-950 text-[9px] text-slate-600 mt-auto font-mono px-4 sm:px-6 select-none pb-16 sm:pb-3">
+        <div className="max-w-[1800px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0">
+          <div className="text-center sm:text-left">© 2026 SPX Price Action Compass · 数据延迟 (t-1) · 非投资建议 学习用途</div>
+          <a
+            href="https://github.com/kain26/SPX-Price-Action-Compass"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-slate-600 hover:text-white transition-colors duration-200"
+            title="View on GitHub"
+          >
+            <Github className="w-3.5 h-3.5" />
+            <span>GitHub Repo</span>
+          </a>
+        </div>
       </footer>
 
       {/* Mobile Bottom Navigation */}
