@@ -1052,8 +1052,8 @@ export default function PriceActionChart({
           </button>
           <input
             type="range"
-            min={15}
-            max={Math.min(totalCandles, 150)}
+            min={Math.min(15, totalCandles)}
+            max={Math.max(Math.min(15, totalCandles), Math.min(totalCandles, 150))}
             value={zoomLevel}
             onChange={(e) => {
               const val = parseInt(e.target.value);

@@ -21,13 +21,18 @@ const CATEGORIES = [
 
 export default function ChallengeMode({ candles, patterns, zones, trend, isChineseStyle = false }: ChallengeModeProps) {
   // Filter only high quality / recognizable patterns to test the user on
-  const challengePatterns = patterns.filter(p => 
-    p.type.includes("PIN_BAR") || 
-    p.type.includes("ENGULFING") || 
-    p.type.includes("DOUBLE") || 
-    p.type.includes("HEAD_AND_SHOULDERS") ||
-    p.type.includes("STAR")
-  );
+  // Ensure that there are at least 70 historical candles before the pattern so that the user always gets a clear 71-candle big-picture view
+  const challengePatterns = patterns.filter(p => {
+    const endIdx = Math.max(...p.candleIndices);
+    const hasEnoughHistory = endIdx >= 70;
+    return hasEnoughHistory && (
+      p.type.includes("PIN_BAR") || 
+      p.type.includes("ENGULFING") || 
+      p.type.includes("DOUBLE") || 
+      p.type.includes("HEAD_AND_SHOULDERS") ||
+      p.type.includes("STAR")
+    );
+  });
 
   // Chronologically sort patterns (oldest to newest)
   const sortedPatterns = [...challengePatterns].sort((a, b) => {
