@@ -92,6 +92,21 @@ SPX Price Action Compass 采用优雅的现代全栈架构：
 - **🌐 在线演示地址**: [https://spx-price-action-compass-773950940183.asia-south1.run.app/](https://spx-price-action-compass-773950940183.asia-south1.run.app/)
 - **📑 核心项目架构说明书**: 详情请参阅项目根目录下的 [ARCHITECTURE.md](ARCHITECTURE.md) 指引，涵盖了底层 SVG 矢量绘图引擎、一维凝聚层级聚类算法、以及全离线价格行为探测指标判定逻辑。
 
+---
+
+## 🔄 自动化持续集成与部署 (CI/CD Pipeline)
+
+本项目已实现 **100% 自动化的 CI/CD 持续集成与持续部署**。采用 **GitHub**、**Google Cloud Build** 与 **Google Cloud Run** 的原生云原生方案：
+
+- **⚡ 自动触发 (Continuous Integration)**：
+  当有新的提交被推送（Push）或合并（Merge）到 GitHub 的 `main` 分支时，将通过 Google Cloud 的 Webhook 机制无缝触发持续集成流水线。
+- **🐳 容器化多阶段构建 (Dockerized Build)**：
+  - 流水线会自动读取项目根目录下的 `Dockerfile`，采用轻量级、安全的 `node:22-alpine` 基础镜像进行**多阶段构建 (Multi-stage Build)**。
+  - **Builder 阶段**：安装全部依赖，执行前端资产打包与后端 TypeScript 服务器混淆编译 (`npm run build`)，将 `server.ts` 及其引用的文件打包为单一、极速启动的 `dist/server.cjs` 模块。
+  - **Runner 阶段**：仅保留生产环境必需的轻量运行时和 `dist/`、`data/` 目录，剔除不必要的 `node_modules` 及开发工具，确保镜像精简、冷启动响应速度极快。
+- **🚀 无缝滚动部署 (Continuous Deployment)**：
+  编译并打包成 Docker 镜像后，系统将自动发布到 **Google Artifact Registry**，并秒级部署至 **Google Cloud Run**。支持**零停机时间（Zero-downtime）**滚动升级和自动弹性伸缩（Scale to Zero），保障系统始终高可用。
+
 ### 技术选型 (Tech Stack)
 
 - **Frontend:**
