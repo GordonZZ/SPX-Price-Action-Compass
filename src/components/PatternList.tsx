@@ -42,6 +42,8 @@ interface PatternListProps {
   syncing: boolean;
   lastUpdated: string;
   timeframe?: string;
+  candles?: any[];
+  isChineseStyle?: boolean;
 }
 
 // Convert structure types into clinical, standard quantitative jargon
@@ -83,6 +85,8 @@ export default function PatternList({
   syncing,
   lastUpdated,
   timeframe,
+  candles,
+  isChineseStyle,
 }: PatternListProps) {
   
   const [showAllBehaviors, setShowAllBehaviors] = useState(false);
@@ -149,9 +153,9 @@ export default function PatternList({
                       key={z.id}
                       className={`p-3 rounded-none border text-center transition-all ${
                         isSupport
-                          ? "bg-black border-[var(--up-color)] text-[var(--up-color)] shadow-sm"
+                          ? "bg-black border-[#00c805] text-[#00c805] shadow-sm"
                           : isResistance
-                            ? "bg-black border-[var(--down-color)] text-[var(--down-color)] shadow-sm"
+                            ? "bg-black border-[#ff3b30] text-[#ff3b30] shadow-sm"
                             : "bg-black border-neutral-800 text-slate-200"
                       }`}
                     >
@@ -237,6 +241,8 @@ export default function PatternList({
               <DiagnosticModal
                 pattern={activeFocus}
                 onClose={() => setShowLocalDiag(false)}
+                candles={candles}
+                isChineseStyle={isChineseStyle}
               />
             )}
 
@@ -291,11 +297,11 @@ export default function PatternList({
                 let accentColor = "text-[#eab308]";
                 let leftBorder = "border-l-amber-500";
                 if (isBullish) {
-                  accentColor = "text-[var(--up-color)]";
-                  leftBorder = "border-l-[var(--up-color)]";
+                  accentColor = "text-[#00c805]";
+                  leftBorder = "border-l-[#00c805]";
                 } else if (isBearish) {
-                  accentColor = "text-[var(--down-color)]";
-                  leftBorder = "border-l-[var(--down-color)]";
+                  accentColor = "text-[#ff3b30]";
+                  leftBorder = "border-l-[#ff3b30]";
                 }
 
                 return (

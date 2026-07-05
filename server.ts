@@ -51,7 +51,7 @@ function ensureDataFiles() {
     const filePath = timeframeFiles[tf];
     if (fs.existsSync(filePath) && fs.readFileSync(filePath, "utf-8").trim() !== "") {
       try {
-        const data = JSON.parse(fs.readFileSync(filePath, "utf-8")); caches[tf] = data.candles || data;
+        caches[tf] = JSON.parse(fs.readFileSync(filePath, "utf-8"));
         lastSyncTimes[tf] = Date.now() - 5 * 60 * 1000; // Assume fresh on load
         console.log(`Loaded ${caches[tf].length} candles for timeframe: ${tf} from cache.`);
       } catch (e) {

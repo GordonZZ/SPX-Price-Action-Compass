@@ -40,6 +40,7 @@ interface PriceActionChartProps {
   focusIndex?: number | null;
   onCandleClick?: (candle: Candle) => void;
   timeframe?: string;
+  isChineseStyle?: boolean;
 }
 
 export default function PriceActionChart({
@@ -56,6 +57,7 @@ export default function PriceActionChart({
   focusIndex = null,
   onCandleClick,
   timeframe,
+  isChineseStyle = false,
 }: PriceActionChartProps) {
   // Chart view state: indices of visible candles
   const totalCandles = candles.length;
@@ -156,8 +158,8 @@ export default function PriceActionChart({
   const priceRange = Math.max(0.01, maxPrice - minPrice);
 
   // Chart dimensions
-  const chartHeight = 380;
-  const volumeHeight = 60;
+  const chartHeight = 310;
+  const volumeHeight = 50;
   const totalChartHeight = chartHeight + (showVolume ? volumeHeight : 0);
   const chartWidth = 720; // Will scale responsively inside parent SVG viewBox
   const candleAreaWidth = chartWidth - 60; // 60px reserved for the left-side Y-axis column
@@ -756,9 +758,9 @@ export default function PriceActionChart({
       
       // No borders (stroke) - pure soft translucent colored block (色块)
       const colorClass = isSupport 
-        ? "fill-[var(--up-color)]/10"
+        ? "fill-[#00c805]/10" 
         : isResistance 
-          ? "fill-[var(--down-color)]/10"
+          ? "fill-[#ff3b30]/10" 
           : "fill-amber-500/10";
 
       return (
@@ -780,9 +782,9 @@ export default function PriceActionChart({
             strokeDasharray="4,3"
             className={
               isSupport 
-                ? "stroke-[var(--up-color)]/45 stroke-[1]"
+                ? "stroke-[#00c805]/45 stroke-[1]" 
                 : isResistance 
-                  ? "stroke-[var(--down-color)]/45 stroke-[1]"
+                  ? "stroke-[#ff3b30]/45 stroke-[1]" 
                   : "stroke-amber-400/45 stroke-[1]"
             }
           />
@@ -793,9 +795,9 @@ export default function PriceActionChart({
             textAnchor="end"
             className={`font-mono text-[9px] font-medium ${
               isSupport 
-                ? "fill-[var(--up-color)]"
+                ? "fill-[#00c805]" 
                 : isResistance 
-                  ? "fill-[var(--down-color)]"
+                  ? "fill-[#ff3b30]" 
                   : "fill-amber-400"
             }`}
           >
@@ -821,7 +823,9 @@ export default function PriceActionChart({
 
         if (isNaN(x) || isNaN(y)) return null;
 
-        const badgeColor = l.label.startsWith("H") ? "fill-[var(--up-color)]" : "fill-[var(--down-color)]";
+        const badgeColor = l.label.startsWith("H")
+          ? (isChineseStyle ? "fill-[#ff3b30]" : "fill-[#00c805]")
+          : (isChineseStyle ? "fill-[#00c805]" : "fill-[#ff3b30]");
         const textColor = "fill-slate-950";
 
         return (
@@ -885,16 +889,28 @@ export default function PriceActionChart({
         const isPending = pattern.type === "PENDING_SIGNAL";
         const isBullish = !isPending && (pattern.type.includes("BULLISH") || pattern.type.includes("BOTTOM") || pattern.type.includes("MORNING") || pattern.type.includes("FLAG_BULLISH") || pattern.type.includes("DOUBLE_BOTTOM"));
         
-        let borderClass = isPending ? "stroke-[#2663ff]/40" : (isBullish ? "stroke-[var(--up-color)]/40" : "stroke-[var(--down-color)]/40");
-        let fillClass = isPending ? "fill-[#2663ff]/[0.02]" : (isBullish ? "fill-[var(--up-color)]/[0.02]" : "fill-[var(--down-color)]/[0.02]");
+        let borderClass = isPending 
+          ? "stroke-[#2663ff]/40" 
+          : (isBullish 
+            ? (isChineseStyle ? "stroke-[#ff3b30]/40" : "stroke-[#00c805]/40") 
+            : (isChineseStyle ? "stroke-[#00c805]/40" : "stroke-[#ff3b30]/40"));
+        let fillClass = isPending 
+          ? "fill-[#2663ff]/[0.02]" 
+          : (isBullish 
+            ? (isChineseStyle ? "fill-[#ff3b30]/[0.02]" : "fill-[#00c805]/[0.02]") 
+            : (isChineseStyle ? "fill-[#00c805]/[0.02]" : "fill-[#ff3b30]/[0.02]"));
 
         if (isSelected) {
           borderClass = isPending 
             ? "stroke-[#2663ff] stroke-[1.5] drop-shadow-[0_0_4px_rgba(38,99,255,0.3)]" 
             : (isBullish 
-              ? "stroke-[var(--up-color)] stroke-[2] drop-shadow-[0_0_4px_var(--up-shadow-color)]"
-              : "stroke-[var(--down-color)] stroke-[2] drop-shadow-[0_0_4px_var(--down-shadow-color)]");
-          fillClass = isPending ? "fill-[#2663ff]/8" : (isBullish ? "fill-[var(--up-color)]/10" : "fill-[var(--down-color)]/10");
+              ? (isChineseStyle ? "stroke-[#ff3b30] stroke-[2] drop-shadow-[0_0_4px_rgba(255,59,48,0.3)]" : "stroke-[#00c805] stroke-[2] drop-shadow-[0_0_4px_rgba(0,200,5,0.3)]") 
+              : (isChineseStyle ? "stroke-[#00c805] stroke-[2] drop-shadow-[0_0_4px_rgba(0,200,5,0.3)]" : "stroke-[#ff3b30] stroke-[2] drop-shadow-[0_0_4px_rgba(255,59,48,0.3)]"));
+          fillClass = isPending 
+            ? "fill-[#2663ff]/8" 
+            : (isBullish 
+              ? (isChineseStyle ? "fill-[#ff3b30]/10" : "fill-[#00c805]/10") 
+              : (isChineseStyle ? "fill-[#00c805]/10" : "fill-[#ff3b30]/10"));
         }
 
         const labelText = getPatternLabel(pattern.type, pattern.name);
@@ -902,10 +918,16 @@ export default function PriceActionChart({
         const badgeX = xStart + (width - badgeWidth) / 2;
         const badgeY = yTop - 15;
 
-        let badgeBgClass = isPending
-          ? "fill-[#070d1a] stroke-[#2663ff]/40"
-          : (isBullish ? "fill-[var(--up-color)]/15 stroke-[var(--up-color)]/40" : "fill-[var(--down-color)]/15 stroke-[var(--down-color)]/40");
-        let textFillClass = isPending ? "fill-[#5185ff]" : (isBullish ? "fill-[var(--up-color)]" : "fill-[var(--down-color)]");
+        let badgeBgClass = isPending 
+          ? "fill-[#070d1a] stroke-[#2663ff]/40" 
+          : (isBullish 
+            ? (isChineseStyle ? "fill-[#3a1515] stroke-[#6e2727]" : "fill-[#132c1e] stroke-[#24593b]") 
+            : (isChineseStyle ? "fill-[#132c1e] stroke-[#24593b]" : "fill-[#3a1515] stroke-[#6e2727]"));
+        let textFillClass = isPending 
+          ? "fill-[#5185ff]" 
+          : (isBullish 
+            ? (isChineseStyle ? "fill-[#f87171]" : "fill-[#4ade80]") 
+            : (isChineseStyle ? "fill-[#4ade80]" : "fill-[#f87171]"));
 
         if (isSelected && !isPending) {
           badgeBgClass = "fill-[#2663ff] stroke-[#4f80ff]";
@@ -975,7 +997,7 @@ export default function PriceActionChart({
         <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-3">
           {/* S&P 500 Index Title / SPX 5m */}
           <div className="flex items-center gap-2">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-[var(--up-color)] animate-pulse"></span>
+            <span className="flex h-1.5 w-1.5 rounded-full bg-[#00c805] animate-pulse"></span>
             <h3 className="text-xs font-semibold text-slate-100 font-mono">
               {/* Desktop version */}
               <span className="hidden sm:inline">
@@ -1015,10 +1037,12 @@ export default function PriceActionChart({
           {hoveredCandle && (
             <p className="text-[9px] sm:text-[10px] font-mono text-slate-400 flex flex-wrap gap-x-2 gap-y-0.5">
               <span>时间: <b className="text-slate-200">{new Date(hoveredCandle.candle.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b></span>
-              <span>开: <b className="text-[var(--up-color)]">{hoveredCandle.candle.open}</b></span>
-              <span>高: <b className="text-[var(--up-color)]">{hoveredCandle.candle.high}</b></span>
-              <span>低: <b className="text-[var(--down-color)]">{hoveredCandle.candle.low}</b></span>
-              <span>收: <b className={hoveredCandle.candle.close >= hoveredCandle.candle.open ? "text-[var(--up-color)]" : "text-[var(--down-color)]"}>{hoveredCandle.candle.close}</b></span>
+              <span>开: <b className="text-slate-200">{hoveredCandle.candle.open}</b></span>
+              <span>高: <b className="text-slate-200">{hoveredCandle.candle.high}</b></span>
+              <span>低: <b className="text-slate-200">{hoveredCandle.candle.low}</b></span>
+              <span>收: <b className={hoveredCandle.candle.close >= hoveredCandle.candle.open 
+                ? (isChineseStyle ? "text-[#ff3b30]" : "text-[#00c805]") 
+                : (isChineseStyle ? "text-[#00c805]" : "text-[#ff3b30]")}>{hoveredCandle.candle.close}</b></span>
             </p>
           )}
         </div>
@@ -1072,10 +1096,10 @@ export default function PriceActionChart({
             TREND:
           </span>
           <span className={`flex items-center gap-1 text-[9px] font-mono font-bold px-1 py-0.5 rounded ${
-            trend.direction === "UP"
-              ? "bg-[var(--up-color)]/15 text-[var(--up-color)] border border-[var(--up-color)]/40"
-              : trend.direction === "DOWN"
-                ? "bg-[var(--down-color)]/15 text-[var(--down-color)] border border-[var(--down-color)]/40"
+            trend.direction === "UP" 
+              ? (isChineseStyle ? "bg-[#3a1515] text-[#f87171] border border-[#6e2727]" : "bg-[#132c1e] text-[#4ade80] border border-[#24593b]") 
+              : trend.direction === "DOWN" 
+                ? (isChineseStyle ? "bg-[#132c1e] text-[#4ade80] border border-[#24593b]" : "bg-[#3a1515] text-[#f87171] border border-[#6e2727]") 
                 : "bg-neutral-800 text-slate-300 border border-neutral-700"
           }`}>
             {trend.direction === "UP" && "↑ 看涨"}
@@ -1227,8 +1251,12 @@ export default function PriceActionChart({
               const yLow = getY(c.low);
 
               const isBullish = c.close >= c.open;
-              const strokeColor = isBullish ? "stroke-[var(--up-color)]" : "stroke-[var(--down-color)]";
-              const fillColor = isBullish ? "fill-[var(--up-color)]" : "fill-[var(--down-color)]";
+              const strokeColor = isBullish 
+                ? (isChineseStyle ? "stroke-[#ff3b30]" : "stroke-[#00c805]") 
+                : (isChineseStyle ? "stroke-[#00c805]" : "stroke-[#ff3b30]");
+              const fillColor = isBullish 
+                ? (isChineseStyle ? "fill-[#ff3b30]" : "fill-[#00c805]") 
+                : (isChineseStyle ? "fill-[#00c805]" : "fill-[#ff3b30]");
               const candleWidth = Math.max(1.5, (candleAreaWidth / zoomLevel) * 0.75);
 
               return (
@@ -1262,7 +1290,9 @@ export default function PriceActionChart({
                 const yVol = getVolY(c.volume);
                 const candleWidth = Math.max(1.5, (candleAreaWidth / zoomLevel) * 0.7);
                 const isBullish = c.close >= c.open;
-                const fillClass = isBullish ? "fill-[var(--up-color)]/20" : "fill-[var(--down-color)]/20";
+                const fillClass = isBullish 
+                  ? (isChineseStyle ? "fill-[#ff3b30]/20" : "fill-[#00c805]/20") 
+                  : (isChineseStyle ? "fill-[#00c805]/20" : "fill-[#ff3b30]/20");
 
                 return (
                   <rect

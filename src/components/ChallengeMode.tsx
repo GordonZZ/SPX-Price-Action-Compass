@@ -8,6 +8,7 @@ interface ChallengeModeProps {
   patterns: DetectedPattern[];
   zones: any[];
   trend: any;
+  isChineseStyle?: boolean;
 }
 
 const CATEGORIES = [
@@ -18,7 +19,7 @@ const CATEGORIES = [
   { id: "HEAD_AND_SHOULDERS", label: "星体/头肩系列" }
 ];
 
-export default function ChallengeMode({ candles, patterns, zones, trend }: ChallengeModeProps) {
+export default function ChallengeMode({ candles, patterns, zones, trend, isChineseStyle = false }: ChallengeModeProps) {
   // Filter only high quality / recognizable patterns to test the user on
   const challengePatterns = patterns.filter(p => 
     p.type.includes("PIN_BAR") || 
@@ -120,18 +121,53 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
 
   const visibleChallengeCandles = getChallengeCandles();
 
-  // Determine correct choice
+  // Determine correct choice based on what ACTUALLY happened in subsequent price action
   const getCorrectAnswer = (): "LONG" | "SHORT" | "NONE" => {
     if (!activePattern) return "NONE";
-    const t = activePattern.type;
     
-    if (t.includes("BULLISH") || t.includes("BOTTOM") || t.includes("MORNING")) {
-      return "LONG";
+    const signalIndex = cutoffIndex;
+    const signalCandle = candles[signalIndex];
+    if (!signalCandle) return "NONE";
+    
+    // Check subsequent candles to find where the price broke out or broke down first
+    const futureCandles = candles.slice(signalIndex + 1, Math.min(candles.length, signalIndex + 20));
+    if (futureCandles.length === 0) {
+      // Fallback to pattern type classification if no future data exists
+      const t = activePattern.type;
+      if (t.includes("BULLISH") || t.includes("BOTTOM") || t.includes("MORNING")) {
+        return "LONG";
+      }
+      if (t.includes("BEARISH") || t.includes("TOP") || t.includes("EVENING")) {
+        return "SHORT";
+      }
+      return "NONE";
     }
-    if (t.includes("BEARISH") || t.includes("TOP") || t.includes("EVENING")) {
-      return "SHORT";
+    
+    const highTrigger = signalCandle.high;
+    const lowTrigger = signalCandle.low;
+    
+    let triggered: "LONG" | "SHORT" | null = null;
+    for (const c of futureCandles) {
+      if (c.high > highTrigger && c.low < lowTrigger) {
+        // Outside day: use the close price direction relative to trigger close
+        triggered = c.close > signalCandle.close ? "LONG" : "SHORT";
+        break;
+      } else if (c.high > highTrigger) {
+        triggered = "LONG";
+        break;
+      } else if (c.low < lowTrigger) {
+        triggered = "SHORT";
+        break;
+      }
     }
-    return "NONE";
+    
+    if (!triggered) {
+      // Fallback: look at the general trend of the last future candle relative to signal candle
+      const lastFutureCandle = futureCandles[futureCandles.length - 1];
+      triggered = lastFutureCandle.close >= signalCandle.close ? "LONG" : "SHORT";
+    }
+    
+    return triggered;
   };
 
   const handleAnswerSubmit = (option: "LONG" | "SHORT" | "NONE") => {
@@ -179,7 +215,7 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
           
           <div className="flex items-center gap-2.5 self-start sm:self-center bg-[#0d0d11] border border-neutral-800 px-3 py-1.5 rounded-none">
             <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider font-mono">训练得分</span>
-            <span className="text-xs font-mono font-bold text-[var(--success-color)]">
+            <span className="text-xs font-mono font-bold text-[#00c805]">
               胜率: {quizScore.total > 0 ? Math.round((quizScore.wins / quizScore.total) * 100) : 0}%
               <span className="text-slate-500 font-normal ml-1">({quizScore.wins}/{quizScore.total})</span>
             </span>
@@ -367,6 +403,7 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
           showTrends={false}
           showVolume={true}
           focusIndex={visibleChallengeCandles.length - 1} // Center on cutoff bar
+          isChineseStyle={isChineseStyle}
         />
         
         {/* Clean borderless guide text block */}
@@ -406,7 +443,7 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
                   </h4>
                   <p className="text-xs text-slate-400 mt-2.5 leading-relaxed font-sans">
                     {isAnswered 
-                      ? activePattern.desc 
+                      ? activePattern.description 
                       : "请研判左侧信号 K 线 (Signal Bar) 附近的价格行为。结合上方支撑阻力以及量价表现，在下方给出你的多空挂单突破决策。答题后将实时复盘并揭晓裸K形态和机构订单流逻辑。"}
                   </p>
                 </div>
@@ -422,9 +459,9 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
                     className={`w-full p-3.5 rounded-none border text-left flex items-center justify-between transition-all cursor-pointer ${
                       isAnswered
                         ? correctAns === "LONG"
-                          ? "bg-[var(--success-color)]/10 border-[var(--success-color)] text-[var(--success-color)]"
+                          ? "bg-[#00c805]/10 border-[#00c805] text-[#00c805]"
                           : selectedOption === "LONG"
-                            ? "bg-[var(--error-color)]/10 border-[var(--error-color)] text-[var(--error-color)]"
+                            ? "bg-[#ff3b30]/10 border-[#ff3b30] text-[#ff3b30]"
                             : "bg-transparent border-neutral-900 text-slate-600"
                         : "bg-black border-neutral-800 hover:border-white hover:bg-neutral-900 text-slate-200"
                     }`}
@@ -433,8 +470,8 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
                       <span className="text-xs font-bold">突破多单 (Long Breakout)</span>
                       <span className="text-[10px] opacity-75 mt-0.5 text-slate-400">在信号 K 线高点上方挂多单，预判上涨。</span>
                     </div>
-                    {isAnswered && correctAns === "LONG" && <Check className="w-4 h-4 text-[var(--success-color)] shrink-0" />}
-                    {isAnswered && selectedOption === "LONG" && correctAns !== "LONG" && <X className="w-4 h-4 text-[var(--error-color)] shrink-0" />}
+                    {isAnswered && correctAns === "LONG" && <Check className="w-4 h-4 text-[#00c805] shrink-0" />}
+                    {isAnswered && selectedOption === "LONG" && correctAns !== "LONG" && <X className="w-4 h-4 text-[#ff3b30] shrink-0" />}
                   </button>
 
                   {/* Option B: SHORT */}
@@ -444,9 +481,9 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
                     className={`w-full p-3.5 rounded-none border text-left flex items-center justify-between transition-all cursor-pointer ${
                       isAnswered
                         ? correctAns === "SHORT"
-                          ? "bg-[var(--success-color)]/10 border-[var(--success-color)] text-[var(--success-color)]"
+                          ? "bg-[#00c805]/10 border-[#00c805] text-[#00c805]"
                           : selectedOption === "SHORT"
-                            ? "bg-[var(--error-color)]/10 border-[var(--error-color)] text-[var(--error-color)]"
+                            ? "bg-[#ff3b30]/10 border-[#ff3b30] text-[#ff3b30]"
                             : "bg-transparent border-neutral-900 text-slate-600"
                         : "bg-black border-neutral-800 hover:border-white hover:bg-neutral-900 text-slate-200"
                     }`}
@@ -455,8 +492,8 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
                       <span className="text-xs font-bold">跌破空单 (Short Breakdown)</span>
                       <span className="text-[10px] opacity-75 mt-0.5 text-slate-400">在信号 K 线低点下方挂空单，预判下行。</span>
                     </div>
-                    {isAnswered && correctAns === "SHORT" && <Check className="w-4 h-4 text-[var(--success-color)] shrink-0" />}
-                    {isAnswered && selectedOption === "SHORT" && correctAns !== "SHORT" && <X className="w-4 h-4 text-[var(--error-color)] shrink-0" />}
+                    {isAnswered && correctAns === "SHORT" && <Check className="w-4 h-4 text-[#00c805] shrink-0" />}
+                    {isAnswered && selectedOption === "SHORT" && correctAns !== "SHORT" && <X className="w-4 h-4 text-[#ff3b30] shrink-0" />}
                   </button>
                 </div>
               </div>
@@ -470,13 +507,13 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
                 {/* Flat, cohesive results ribbon */}
                 <div className={`p-3 rounded-none border flex items-start gap-2.5 ${
                   selectedOption === correctAns 
-                    ? "bg-[var(--success-color)]/5 border-[var(--success-color)] text-[var(--success-color)]"
-                    : "bg-[var(--error-color)]/5 border-[var(--error-color)] text-[var(--error-color)]"
+                    ? "bg-[#00c805]/5 border-[#00c805] text-[#00c805]" 
+                    : "bg-[#ff3b30]/5 border-[#ff3b30] text-[#ff3b30]"
                 }`}>
                   {selectedOption === correctAns ? (
-                    <Check className="w-4 h-4 text-[var(--success-color)] shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-[#00c805] shrink-0 mt-0.5" />
                   ) : (
-                    <X className="w-4 h-4 text-[var(--error-color)] shrink-0 mt-0.5" />
+                    <X className="w-4 h-4 text-[#ff3b30] shrink-0 mt-0.5" />
                   )}
                   <div>
                     <h5 className="text-xs font-bold">
@@ -536,3 +573,4 @@ export default function ChallengeMode({ candles, patterns, zones, trend }: Chall
     </div>
   );
 }
+
